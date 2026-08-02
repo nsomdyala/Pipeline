@@ -10,22 +10,27 @@ Findings marked **[verified]** were probed live on 2 Aug 2026 and the evidence i
 
 ## 1. Architecture & stack decision
 
-### 1.1 The one structural change I'm proposing
+### 1.1 Background jobs — no separate worker service needed
 
-The prompt suggests running the intake adapters as a Vercel cron route or Supabase Edge
-Function. I want to **split the background worker out into its own always-on Node
-service** and keep Vercel for the web app only. Reasons:
+I initially proposed splitting the intake workers onto an always-on Node service, on the
+assumption that SITA would need Playwright. **The spike disproved that** (§3.2), so the
+recommendation is now the simpler one: keep the prompt's original approach and run the
+adapters as scheduled serverless jobs. No extra infrastructure, no extra cost.
 
-- **Headless browsers.** eTenders is solved without one **[verified]**, but SITA's
-  invitations page is a JavaScript-rendered shell — 65 KB of HTML, 30 script tags, zero
-  `<table>` elements **[verified]**. Getting RFQs off it will likely need Playwright,
-  which does not fit in an Edge Function and is painful on Vercel.
-- **Timeouts.** Walking every source with polite rate limiting exceeds Vercel's function
-  ceiling. A worker loop has no such limit.
-- **Stable egress IP.** Scrapers that rotate through serverless IPs look like abuse and
-  get blocked. A fixed IP is both more reliable and more honest.
-- **DOCX → PDF.** The highest-fidelity conversion is headless LibreOffice, which needs a
-  real container.
+The two things that would have forced a container both turned out to be avoidable:
+
+- **Headless browsers — not required.** Every source in scope is either a JSON API or
+  server-rendered HTML **[verified]**. Nothing needs a browser.
+- **DOCX → PDF.** Headless LibreOffice gives the best fidelity but needs a container.
+  Generating the PDF directly instead costs some parity between the DOCX and PDF outputs
+  and removes the requirement. Taken at M5.
+
+Two consequences to respect rather than discover later: the whole run must stay inside
+Vercel's function ceiling, so adapters run as one scheduled job per source rather than a
+single loop over all of them; and serverless egress IPs rotate, so every scraped source
+is rate-limited and cached, and none is on a critical path.
+
+Revisit only if a future SOE portal turns out to need a browser.
 
 Everything else in the proposed stack I accept.
 
@@ -39,7 +44,7 @@ Everything else in the proposed stack I accept.
 | Files | Supabase Storage, private buckets, signed URLs | as proposed |
 | Realtime | Supabase Realtime (chat, board moves) | as proposed |
 | ORM | **Drizzle** | SQL-first, migrations in git, composes with RLS. Prisma is a fine substitute if the team already knows it — say the word |
-| Worker | **Separate Node service** (Railway / Fly / Render) | see §1.1 |
+| Worker | **Vercel Cron**, one scheduled job per source | see §1.1 — no separate service |
 | Inbound email | **Postmark inbound** → webhook | parsed JSON incl. attachments; needs a subdomain you control |
 | DOCX | `docx` | as proposed |
 | PDF merge | `pdf-lib` | merges compliance packs |
@@ -177,7 +182,7 @@ keyword scorer over title + description is doing the real work, not an optimisat
 
 | Source | Approach | Confidence |
 |---|---|---|
-| **SITA** | JS-rendered; needs Playwright, or find the XHR endpoint behind it first (cheaper, try this first) | Medium — needs a spike |
+| **SITA** | **Solved — plain HTML, no browser.** Two feeds, see below | High **[verified]** |
 | **CSD** | Email-in only. Postmark inbound → parser → card | High |
 | **Eskom** | WordPress; `robots.txt` allows everything but `/wp-admin/` **[verified]**. Cheerio + sitemap | High |
 | **Transnet / SANRAL / PRASA / etc.** | One adapter each, added after the pattern is proven | Low until surveyed |
@@ -189,6 +194,35 @@ keyword scorer over title + description is doing the real work, not an optimisat
 Neither SITA nor eTenders serves a `robots.txt` at all (both 404 **[verified]**). Absence
 of a prohibition is not permission, so anything scraped stays rate-limited, cached,
 identified by a real user-agent, and off the critical path.
+
+#### SITA — spike result **[verified]**
+
+My first read was wrong. `www.sita.co.za/content/invitations` looked JavaScript-rendered,
+but those 30 script tags are Drupal and jQuery theme boilerplate; the page is an **iframe
+wrapper**. The data lives on a separate classic-ASP host, server-rendered, and parses
+with Cheerio. Anything scraping `www.sita.co.za` directly would find nothing.
+
+Two distinct feeds, both needed — tenders and RFQs are separate systems:
+
+| Feed | URL | Rows | Yield |
+|---|---|---|---|
+| Tenders (RFB) | `rfq.sita.co.za/TendersAdministration/invitations.asp` | 220 | ref, title, closing date, published date, docs |
+| RFQs | `rfq.sita.co.za/RFQ/RFQInvitations.asp` | 188 | ref, title, closing date, published date, client id, docs |
+
+Also on that host: `RFQsearch.asp` (form: `rfq_year`, `rfq_number`, `rfqclientid`) and
+`RFQBilletinsSelect.asp` — note SITA's own typo in that filename, which is a good
+illustration of how brittle these URLs are.
+
+Document downloads are POST forms carrying `rfq_number` (or `tender_number`) plus
+`view_name`, so fetching attachments means replaying the form, not following a link.
+
+The prompt's claim that SITA is the highest-value source for the ICT lane is borne out by
+the live sample: Cisco unified comms, network switches, Apple hardware, RSA SecurID,
+Trend Micro, emulation software licences.
+
+**One trap.** The listings are not purged — the RFQ feed carries entries that closed in
+2025 alongside current ones **[verified]**. The adapter must filter on closing date and
+must not treat "present on the page" as "open", or the board fills with dead work.
 
 ### 3.3 Adapter interface, dedupe, failure
 
@@ -279,8 +313,8 @@ Order as specified in the prompt. Two sequencing notes:
 
 5. **Single-tenant or future SaaS?** Building for Max Attention only is materially
    simpler. Retrofitting multi-tenancy later is expensive. I've assumed single-tenant.
-6. **Worker hosting budget** — roughly $5–20/mo. Needed to action §1.1.
-7. **SITA spike.** Half a day to find the XHR endpoint before committing to Playwright.
+6. ~~Worker hosting budget~~ — **resolved**, no separate service needed (§1.1).
+7. ~~SITA spike~~ — **resolved**, plain HTML on a separate host (§3.2).
 8. **Provincial/municipal overlap.** Measure how much they duplicate eTenders before
    writing adapters that may be redundant.
 9. **Proposal approval** — is Admin sign-off sufficient, or is a second approver needed?
