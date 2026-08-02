@@ -38,17 +38,16 @@ Everything else in the proposed stack I accept.
 
 | Layer | Choice | Note |
 |---|---|---|
-| Web | Next.js 14+ App Router, TypeScript, Tailwind | as proposed |
+| Web | Next.js App Router, TypeScript, Tailwind | repo already on Next 16 — follow `node_modules/next/dist/docs/` |
 | DB | Postgres via Supabase | as proposed |
 | Auth / RLS | Supabase Auth + row-level security | as proposed |
 | Files | Supabase Storage, private buckets, signed URLs | as proposed |
 | Realtime | Supabase Realtime (chat, board moves) | as proposed |
-| ORM | **Drizzle** | SQL-first, migrations in git, composes with RLS. Prisma is a fine substitute if the team already knows it — say the word |
+| ORM | **Drizzle** | already in `package.json`; SQL-first, migrations in git, composes with RLS |
 | Worker | **Vercel Cron**, one scheduled job per source | see §1.1 — no separate service |
-| Inbound email | **Postmark inbound** → webhook | parsed JSON incl. attachments; needs a subdomain you control |
+| Inbound email | Webhook interface now; provider at M2 | Postmark / Resend / Mailgun all fine — pick when DNS is ready |
 | DOCX | `docx` | as proposed |
-| PDF merge | `pdf-lib` | merges compliance packs |
-| DOCX→PDF | headless LibreOffice in the worker | fidelity |
+| PDF | `pdf-lib` (compliance merge) + generate PDF directly from proposal content | no LibreOffice container; DOCX and PDF are sibling exports, not a convert step |
 | ZIP | `archiver` | as proposed |
 | Search | Postgres `tsvector` + GIN + `unaccent` | no extra infra at 2–10 users |
 
@@ -58,27 +57,24 @@ Everything else in the proposed stack I accept.
 flowchart LR
   subgraph Vercel
     W[Next.js app<br/>UI + API routes]
-  end
-  subgraph Worker["Worker service (always-on)"]
-    S[Scheduler every 4-6h]
-    A[Source adapters]
-    E[Expiry engine]
-    X[Export: DOCX/PDF/ZIP]
+    CRON[Vercel Cron<br/>one job per source]
+    EXP[Expiry + export<br/>routes]
   end
   subgraph Supabase
     DB[(Postgres + RLS)]
     ST[Storage]
     RT[Realtime]
   end
-  PM[Postmark inbound] -->|webhook| W
-  S --> A --> DB
-  E --> DB
+  MAIL[Inbound email webhook] -->|CSD / SAP alerts| W
+  CRON --> A[Source adapters]
+  A --> DB
+  EXP --> DB
+  EXP --> ST
   W <--> DB
   W <--> ST
-  X --> ST
   RT --> W
   A -->|OCDS JSON| ET[eTenders API]
-  A -->|Playwright| SITA[SITA / SOE portals]
+  A -->|Cheerio HTML| SITA[SITA ASP / SOE portals]
   A -->|RSS| NEWS[News monitor]
 ```
 
@@ -90,7 +86,8 @@ Grouped by module. Types shortened; every table gets `id uuid pk`, `created_at`,
 `updated_at` unless noted.
 
 ### Identity & audit
-- **`profiles`** — `user_id`→auth.users, `display_name`, `role` (`admin|member|viewer`), `avatar_path`
+- **`profiles`** — `user_id`→auth.users, `display_name`, `email`, `role` (`admin|member|viewer`), `avatar_path`
+  - Seed Admin: `nsomdyala@maxattention.tech` (role `admin`). Members see **My work** by default; Admin sees **Team**.
 - **`company_profile`** — singleton: `name`, `reg_no`, `csd_no`, `tax_pin`, `vat_no`, `bbbee_level`, `address`, `bank_details`
 - **`audit_log`** — `actor_id`, `entity_type`, `entity_id`, `action`, `diff jsonb`, `at`
 
@@ -297,25 +294,41 @@ Order as specified in the prompt. Two sequencing notes:
 
 **Blocking**
 
-1. **Brand assets.** `/brand` is empty. The six files are needed to build M1 to the
-   stated standard; hex values alone don't give me the mark.
+1. ~~**Brand assets.**~~ **Resolved** — copied from `/Users/test/Desktop/Pipeline/` into
+   `/brand` (marks + CI sheet + README). Mint live bar `#1FC79C` confirmed in SVGs.
 2. **POPIA.** The vault stores director IDs, proofs of address and tax PINs — personal
    and financial information under the Protection of Personal Information Act. This is
    not in the prompt and it changes M4's design: private buckets, signed short-lived
    URLs, access logged in `audit_log`, a retention/deletion policy, and a decision on
    whether viewers may see compliance docs at all. **Please confirm the intended
    retention and access policy.**
-3. **Inbound email domain.** Which subdomain, and do you control its DNS?
+3. ~~**Inbound email domain.**~~ **Resolved (pending DNS confirm)** — company domain
+   is `maxattention.tech`; seed Admin is `nsomdyala@maxattention.tech`. Proposed inbound
+   address: `opportunities@maxattention.tech` (or `pipeline@…`) → webhook. Confirm you
+   control DNS for `maxattention.tech` (MX / inbound route) before M2.
 4. **Portal watchlist seed.** Your real target-client list — the companies you actually
    want work from. Without it, M10's news monitor and watchlist have nothing to point at.
 
+**Ownership & personal views (confirmed)**
+
+Every authenticated user gets a **personal home**: their owned opportunities, projects,
+deadlines, and progress — not the whole team's board by default. Admin
+(`nsomdyala@maxattention.tech`) sees everything and can reassign ownership. Board filters
+default to **My work**; Admin (and anyone who opts in) can switch to **Team**. RLS and
+queries scope by `owner_id` / membership; activity still audited.
+
+Implications for schema/UI already covered by `owner_id` on opportunities and
+`projects` — M1 shells a role-aware sidebar + "My work" dashboard stub; M2 enforces
+ownership on cards; M9 surfaces personal vs team progress on the dashboard.
+
 **Non-blocking but worth deciding early**
 
-5. **Single-tenant or future SaaS?** Building for Max Attention only is materially
-   simpler. Retrofitting multi-tenancy later is expensive. I've assumed single-tenant.
+5. ~~**Single-tenant or future SaaS?**~~ **Assumed single-tenant** — Max Attention only
+   (`maxattention.tech`). Say if that changes.
 6. ~~Worker hosting budget~~ — **resolved**, no separate service needed (§1.1).
 7. ~~SITA spike~~ — **resolved**, plain HTML on a separate host (§3.2).
 8. **Provincial/municipal overlap.** Measure how much they duplicate eTenders before
    writing adapters that may be redundant.
 9. **Proposal approval** — is Admin sign-off sufficient, or is a second approver needed?
 10. Fonts are fine: Sora and IBM Plex Mono are both open-licensed.
+11. ~~**Domain spelling.**~~ **Resolved** — `maxattention.tech`.
