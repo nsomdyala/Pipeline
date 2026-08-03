@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
   DEFAULT_CATEGORY_LANE_MAP,
   defaultEtendersCategories,
@@ -10,6 +10,9 @@ import {
   type TenderStatusFilter,
 } from "@/lib/opportunities/search";
 import { OPP_LANES, type OppLane } from "@/lib/opportunities/types";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function parseBool(value: string | null): boolean | null {
   if (value === "true" || value === "1") return true;
@@ -23,6 +26,21 @@ function multi(searchParams: URLSearchParams, key: string): string[] {
     .flatMap((v) => v.split("|"))
     .map((v) => v.trim());
   return all.filter(Boolean);
+}
+
+function emptyPayload(error: string) {
+  return {
+    error,
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 25,
+    pageCount: 1,
+    facets: { provinces: [], categories: [], buyers: [] },
+    scope: "defaults" as const,
+    defaultCategories: defaultEtendersCategories(),
+    categoryLaneMap: DEFAULT_CATEGORY_LANE_MAP,
+  };
 }
 
 async function resolveDefaultCategories(): Promise<string[]> {
@@ -40,6 +58,39 @@ async function resolveDefaultCategories(): Promise<string[]> {
     // fall through
   }
   return defaultEtendersCategories();
+}
+
+function scheduleBackgroundIntake() {
+  // Never await intake in the search request — a 3-day eTenders pull can exceed
+  // Vercel limits and the platform then returns plain text ("An error occurred…")
+  // instead of our JSON error envelope.
+  after(async () => {
+    try {
+      const { runEtendersIntake } = await import("@/lib/intake/pipeline");
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 3);
+      const fmt = (d: Date) =>
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Africa/Johannesburg",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(d);
+      const result = await runEtendersIntake({
+        dateFrom: fmt(from),
+        dateTo: fmt(to),
+      });
+      console.info("background eTenders intake finished", {
+        status: result.status,
+        fetched: result.fetched,
+        created: result.created,
+        errors: result.errors.slice(0, 3),
+      });
+    } catch (err) {
+      console.error("background eTenders intake failed", err);
+    }
+  });
 }
 
 export async function GET(request: Request) {
@@ -83,30 +134,23 @@ export async function GET(request: Request) {
       pageSize: Number(searchParams.get("pageSize") ?? "25") || 25,
     };
 
-    let all = await listOpportunities({ scope: "all" });
+    let all;
+    try {
+      all = await listOpportunities({ scope: "all" });
+    } catch (err) {
+      console.error("listOpportunities failed in tenders search", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Could not read tenders from the database.";
+      return NextResponse.json(emptyPayload(message), { status: 500 });
+    }
 
-    // First visit on an empty Postgres DB — pull a short eTenders window.
+    let notice: string | undefined;
     if (all.length === 0 && process.env.DATABASE_URL) {
-      try {
-        const { runEtendersIntake } = await import("@/lib/intake/pipeline");
-        const to = new Date();
-        const from = new Date();
-        from.setDate(from.getDate() - 3);
-        const fmt = (d: Date) =>
-          new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Africa/Johannesburg",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          }).format(d);
-        await runEtendersIntake({
-          dateFrom: fmt(from),
-          dateTo: fmt(to),
-        });
-        all = await listOpportunities({ scope: "all" });
-      } catch (err) {
-        console.error("auto eTenders intake failed", err);
-      }
+      scheduleBackgroundIntake();
+      notice =
+        "No tenders in the database yet — a background eTenders pull has been started. Refresh in a minute.";
     }
 
     const result = searchTenders(all, query);
@@ -115,23 +159,14 @@ export async function GET(request: Request) {
       scope,
       defaultCategories: defaults,
       categoryLaneMap: DEFAULT_CATEGORY_LANE_MAP,
+      ...(notice ? { notice } : {}),
     });
   } catch (err) {
     console.error("tenders search failed", err);
-    return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Tender search failed. Check DATABASE_URL.",
-        items: [],
-        total: 0,
-        page: 1,
-        pageSize: 25,
-        pageCount: 1,
-        facets: { provinces: [], categories: [], buyers: [] },
-      },
-      { status: 500 },
-    );
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Tender search failed. Check DATABASE_URL.";
+    return NextResponse.json(emptyPayload(message), { status: 500 });
   }
 }

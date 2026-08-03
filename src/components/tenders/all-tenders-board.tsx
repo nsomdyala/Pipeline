@@ -7,6 +7,7 @@ import {
   formatZaDate,
   workingDaysUntil,
 } from "@/lib/opportunities/dates";
+import { readJsonResponse } from "@/lib/http/read-json";
 import {
   deriveTenderStatus,
   type TenderSearchResult,
@@ -27,6 +28,8 @@ type Filters = {
 type SearchPayload = TenderSearchResult & {
   scope?: Scope;
   defaultCategories?: string[];
+  error?: string;
+  notice?: string;
 };
 
 export function AllTendersBoard() {
@@ -35,6 +38,7 @@ export function AllTendersBoard() {
   const [draft, setDraft] = useState<Filters | null>(null);
   const [result, setResult] = useState<SearchPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [promotingId, setPromotingId] = useState<string | null>(null);
@@ -42,6 +46,7 @@ export function AllTendersBoard() {
   const load = useCallback((next: Filters) => {
     setLoading(true);
     setError(null);
+    setNotice(null);
     const params = new URLSearchParams();
     if (next.q.trim()) params.set("q", next.q.trim());
     if (next.type !== "all") params.set("type", next.type);
@@ -54,9 +59,14 @@ export function AllTendersBoard() {
     startTransition(async () => {
       try {
         const res = await fetch(`/api/tenders/search?${params}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Search failed.");
-        setResult(data as SearchPayload);
+        const parsed = await readJsonResponse<SearchPayload>(res);
+        if (!parsed.ok) {
+          throw new Error(parsed.error);
+        }
+        const data = parsed.data;
+        if (data.error) setError(data.error);
+        if (data.notice) setNotice(data.notice);
+        setResult(data);
         setFilters(next);
         setDraft(next);
       } catch (err) {
@@ -286,6 +296,11 @@ export function AllTendersBoard() {
       {error ? (
         <p className="mb-3 text-sm font-semibold text-coral" role="alert">
           {error}
+        </p>
+      ) : null}
+      {notice && !error ? (
+        <p className="mb-3 text-sm text-navy" role="status">
+          {notice}
         </p>
       ) : null}
 
