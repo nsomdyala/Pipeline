@@ -1,17 +1,21 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { dataPath } from "@/lib/json-store";
 import { getOpportunity } from "@/lib/opportunities/store";
+import { enrichTenderDocuments } from "@/lib/tenders/enrich-documents";
 
 type Params = { params: Promise<{ id: string; docIndex: string }> };
 
-const ALLOWED_HOSTS = new Set([
-  "www.etenders.gov.za",
-  "etenders.gov.za",
-  "ocds-api.etenders.gov.za",
-]);
-
-const CACHE_DIR = path.join(process.cwd(), ".data", "tender-docs");
+function isAllowedHost(hostname: string) {
+  const h = hostname.toLowerCase();
+  return (
+    h === "www.etenders.gov.za" ||
+    h === "etenders.gov.za" ||
+    h === "ocds-api.etenders.gov.za" ||
+    h.endsWith(".etenders.gov.za")
+  );
+}
 
 function safeFilename(name: string) {
   return name.replace(/[^\w.\- ()[\]]+/g, "_").slice(0, 180) || "document.pdf";
@@ -33,7 +37,7 @@ function guessMime(format: string | undefined, filename: string) {
 }
 
 function cachePaths(opportunityId: string, index: number, filename: string) {
-  const dir = path.join(CACHE_DIR, opportunityId);
+  const dir = dataPath("tender-docs", opportunityId);
   const stored = `${index}-${safeFilename(filename)}`;
   return {
     dir,
@@ -49,14 +53,24 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Invalid document." }, { status: 400 });
   }
 
-  const opportunity = await getOpportunity(id);
+  let opportunity = await getOpportunity(id);
   if (!opportunity) {
     return NextResponse.json({ error: "Tender not found." }, { status: 404 });
   }
 
+  if (!opportunity.documentLinks[index]) {
+    opportunity = await enrichTenderDocuments(opportunity);
+  }
+
   const doc = opportunity.documentLinks[index];
   if (!doc?.url) {
-    return NextResponse.json({ error: "Document not found." }, { status: 404 });
+    return NextResponse.json(
+      {
+        error:
+          "No downloadable document is listed for this tender yet. Try again shortly, or open the eTenders release link from the tender page.",
+      },
+      { status: 404 },
+    );
   }
 
   let remote: URL;
@@ -66,7 +80,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Invalid document URL." }, { status: 400 });
   }
 
-  if (!ALLOWED_HOSTS.has(remote.hostname.toLowerCase())) {
+  if (!isAllowedHost(remote.hostname)) {
     return NextResponse.json(
       { error: "Document host is not allowed." },
       { status: 400 },
@@ -129,13 +143,21 @@ export async function GET(_request: Request, { params }: Params) {
     const contentType =
       upstream.headers.get("content-type") || guessMime(doc.format, filename);
 
-    await mkdir(dir, { recursive: true });
-    await writeFile(filePath, buffer);
-    await writeFile(
-      metaPath,
-      JSON.stringify({ contentType, sourceUrl: doc.url, cachedAt: new Date().toISOString() }),
-      "utf8",
-    );
+    try {
+      await mkdir(dir, { recursive: true });
+      await writeFile(filePath, buffer);
+      await writeFile(
+        metaPath,
+        JSON.stringify({
+          contentType,
+          sourceUrl: doc.url,
+          cachedAt: new Date().toISOString(),
+        }),
+        "utf8",
+      );
+    } catch {
+      // cache is best-effort (e.g. read-only FS) — still return the file
+    }
 
     return new NextResponse(buffer, {
       headers: {

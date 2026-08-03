@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ETENDERS_BASE } from "@/lib/intake/adapters/etenders/client";
 import type { OcdsRelease } from "@/lib/intake/adapters/etenders/types";
 import type { NormalisedOpportunity } from "@/lib/intake/types";
 
@@ -101,9 +102,12 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
     .digest("hex")
     .slice(0, 32);
 
+  const tenderRef = str(tender.id);
+
   return {
     externalId: ocid,
-    refNo: ocid,
+    // Prefer the human tender / RFQ number; keep OCID as externalId for dedupe.
+    refNo: tenderRef ?? ocid,
     sourceKey: "etenders",
     sourceLabel: "eTenders",
     sector: "public",
@@ -120,7 +124,7 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
     documents,
     briefing,
     contact,
-    sourceUrl: "https://www.etenders.gov.za",
+    sourceUrl: `${ETENDERS_BASE}/api/OCDSReleases/release/${encodeURIComponent(ocid)}`,
     contentHash,
     hasFrameworkAgreement: tender.techniques?.hasFrameworkAgreement ?? null,
     panelMaxParticipants:

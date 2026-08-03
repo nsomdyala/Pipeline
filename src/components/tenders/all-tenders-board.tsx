@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   formatZaDate,
@@ -29,6 +30,7 @@ type SearchPayload = TenderSearchResult & {
 };
 
 export function AllTendersBoard() {
+  const router = useRouter();
   const [filters, setFilters] = useState<Filters | null>(null);
   const [draft, setDraft] = useState<Filters | null>(null);
   const [result, setResult] = useState<SearchPayload | null>(null);
@@ -168,8 +170,8 @@ export function AllTendersBoard() {
           <p className="mt-2 max-w-2xl text-sm text-muted">
             Defaults load automatically from our eTenders categories. Use{" "}
             <span className="font-semibold text-ink">Search outside defaults</span>{" "}
-            for RFQs, tenders and RFPs in other categories. Open a row to view and
-            download documents.
+            for RFQs, tenders and RFPs in other categories. Click any row to open
+            the tender, view details, and download documents.
           </p>
         </div>
         <Link
@@ -329,23 +331,27 @@ export function AllTendersBoard() {
                 return (
                   <tr
                     key={item.id}
-                    className="border-b border-navy/5 align-top last:border-0 hover:bg-mist/40"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => router.push(`/tenders/${item.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/tenders/${item.id}`);
+                      }
+                    }}
+                    className="cursor-pointer border-b border-navy/5 align-top last:border-0 hover:bg-mist/40"
                   >
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/tenders/${item.id}`}
-                        className="font-mono text-xs text-mint hover:underline"
-                      >
+                      <span className="font-mono text-xs font-semibold text-mint">
                         {item.refNo}
-                      </Link>
+                      </span>
+                      <div className="mt-1 text-[0.65rem] font-semibold text-navy/70">
+                        Open →
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/tenders/${item.id}`}
-                        className="block font-semibold text-ink hover:text-navy"
-                      >
-                        {item.title}
-                      </Link>
+                      <div className="font-semibold text-ink">{item.title}</div>
                       <div className="mt-0.5 text-xs text-muted">
                         {item.buyer}
                         {item.province ? ` · ${item.province}` : ""}
@@ -382,7 +388,11 @@ export function AllTendersBoard() {
                         {status.replace("_", " ")}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td
+                      className="px-4 py-3 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
                       {item.convertedToLeadId ? (
                         <Link
                           href="/leads"

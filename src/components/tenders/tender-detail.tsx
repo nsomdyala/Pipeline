@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   formatZaDate,
   formatZar,
@@ -23,20 +23,25 @@ export function TenderDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [promoting, setPromoting] = useState(false);
+  const [refreshingDocs, setRefreshingDocs] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/tenders/${id}`);
+    const data = (await res.json()) as {
+      opportunity?: Opportunity;
+      error?: string;
+    };
+    if (!res.ok || !data.opportunity) {
+      throw new Error(data.error ?? "Tender not found.");
+    }
+    setItem(data.opportunity);
+  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/tenders/${id}`);
-        const data = (await res.json()) as {
-          opportunity?: Opportunity;
-          error?: string;
-        };
-        if (!res.ok || !data.opportunity) {
-          throw new Error(data.error ?? "Tender not found.");
-        }
-        if (!cancelled) setItem(data.opportunity);
+        await load();
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Could not load tender.");
@@ -48,7 +53,7 @@ export function TenderDetail({ id }: { id: string }) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [load]);
 
   function promote() {
     if (!item) return;
@@ -75,6 +80,24 @@ export function TenderDetail({ id }: { id: string }) {
         );
       } finally {
         setPromoting(false);
+      }
+    });
+  }
+
+  function refreshDocuments() {
+    setRefreshingDocs(true);
+    setError(null);
+    startTransition(async () => {
+      try {
+        await load();
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not refresh documents.",
+        );
+      } finally {
+        setRefreshingDocs(false);
       }
     });
   }
@@ -109,6 +132,7 @@ export function TenderDetail({ id }: { id: string }) {
     : item.opportunityType === "rfq"
       ? "RFQ"
       : "Tender / RFP";
+  const docCount = item.documentLinks.length + item.files.length;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8 md:px-10">
@@ -125,7 +149,14 @@ export function TenderDetail({ id }: { id: string }) {
           <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-navy">
             {typeLabel}
           </span>
-          <span className="font-mono text-xs text-muted">{item.refNo}</span>
+          <span className="font-mono text-xs font-semibold text-ink">
+            {item.refNo}
+          </span>
+          {item.externalId && item.externalId !== item.refNo ? (
+            <span className="font-mono text-[0.65rem] text-muted">
+              {item.externalId}
+            </span>
+          ) : null}
           {item.category ? (
             <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
               {item.category}
@@ -164,6 +195,16 @@ export function TenderDetail({ id }: { id: string }) {
           <div className="label-mono">Lane</div>
           <div className="mt-1 text-sm font-semibold text-ink">{item.lane}</div>
         </div>
+        <div>
+          <div className="label-mono">Source</div>
+          <div className="mt-1 text-sm font-semibold text-ink">{item.source}</div>
+        </div>
+        <div>
+          <div className="label-mono">Documents</div>
+          <div className="mt-1 text-sm font-semibold text-ink">
+            {docCount} available
+          </div>
+        </div>
         {item.briefingAt ? (
           <div className="sm:col-span-2">
             <div className="label-mono">Briefing</div>
@@ -196,20 +237,42 @@ export function TenderDetail({ id }: { id: string }) {
       ) : null}
 
       <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-navy/5">
-        <h2 className="text-base font-semibold text-ink">Documents</h2>
-        <p className="mt-1 text-sm text-muted">
-          Download packs here — files stay inside Pipeline.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-ink">
+              Tender documents
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Download the pack inside Pipeline — no need to leave for eTenders.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={refreshDocuments}
+            disabled={refreshingDocs || pending}
+            className="rounded-xl border border-navy/10 bg-white px-3 py-2 text-xs font-semibold text-navy disabled:opacity-60"
+          >
+            {refreshingDocs ? "Refreshing…" : "Refresh from eTenders"}
+          </button>
+        </div>
         <ul className="mt-4 space-y-2">
           {item.documentLinks.map((doc, index) => (
             <li key={`${doc.url}-${index}`}>
               <a
                 href={`/api/tenders/${item.id}/documents/${index}`}
-                download
-                className="flex items-center justify-between gap-3 rounded-xl bg-mist/60 px-3 py-2.5 text-sm font-semibold text-navy hover:bg-mint/15"
+                className="flex items-center justify-between gap-3 rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white transition hover:bg-navy/90"
               >
-                <span>{doc.title || "Document"}</span>
-                <span className="shrink-0 text-xs font-semibold text-mint">
+                <span className="min-w-0">
+                  <span className="block truncate">
+                    {doc.title || `Document ${index + 1}`}
+                  </span>
+                  {doc.format ? (
+                    <span className="mt-0.5 block font-mono text-[0.65rem] font-normal text-mint/90">
+                      {doc.format}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-navy">
                   Download
                 </span>
               </a>
@@ -219,27 +282,41 @@ export function TenderDetail({ id }: { id: string }) {
             <li key={file.id}>
               <a
                 href={`/api/opportunities/${item.id}/files/${file.id}`}
-                download
-                className="flex items-center justify-between gap-3 rounded-xl bg-mist/60 px-3 py-2.5 text-sm font-semibold text-navy hover:bg-mint/15"
+                className="flex items-center justify-between gap-3 rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white transition hover:bg-navy/90"
               >
-                <span>
+                <span className="min-w-0 truncate">
                   {file.filename}
-                  <span className="ml-2 font-mono text-xs font-normal text-muted">
+                  <span className="ml-2 font-mono text-xs font-normal text-mint/90">
                     {formatBytes(file.size)}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs font-semibold text-mint">
+                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-navy">
                   Download
                 </span>
               </a>
             </li>
           ))}
-          {item.documentLinks.length === 0 && item.files.length === 0 ? (
-            <li className="text-sm text-muted">
-              No documents attached for this tender yet.
+          {docCount === 0 ? (
+            <li className="rounded-xl border border-dashed border-navy/15 px-4 py-6 text-center text-sm text-muted">
+              No documents listed yet. Use{" "}
+              <span className="font-semibold text-ink">Refresh from eTenders</span>{" "}
+              to pull the official download links.
             </li>
           ) : null}
         </ul>
+        {item.sourceUrl ? (
+          <p className="mt-4 text-xs text-muted">
+            Source release:{" "}
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-mint hover:underline"
+            >
+              Open OCDS JSON
+            </a>
+          </p>
+        ) : null}
       </section>
 
       <div className="flex flex-wrap gap-2">
