@@ -10,6 +10,7 @@
   --muted: #5d7488;
   --white: #ffffff;
   --sidebar-width: 15.5rem;
+  --chat-rail-width: 22rem;
 
   --background: var(--mist);
   --foreground: var(--ink);
@@ -62,4 +63,126 @@ body {
   font-weight: 600;
   letter-spacing: -0.035em;
   color: #ffffff;
+}
+
+/* Login landing */
+.login-atmosphere {
+  background:
+    radial-gradient(ellipse 70% 55% at 12% 18%, rgba(31, 199, 156, 0.16), transparent 55%),
+    radial-gradient(ellipse 45% 40% at 90% 75%, rgba(31, 199, 156, 0.07), transparent 50%),
+    linear-gradient(160deg, #0d1f33 0%, #122a42 48%, #0a1828 100%);
+}
+
+.login-splash {
+  animation: login-splash-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.login-splash-mark {
+  filter: drop-shadow(0 12px 40px rgba(31, 199, 156, 0.28));
+}
+
+.login-auth {
+  animation: login-rise-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.login-enter {
+  animation: login-enter-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.login-enter-mark {
+  filter: drop-shadow(0 12px 40px rgba(31, 199, 156, 0.32));
+}
+
+/* Animated mark bars — advance left to right, then ease back */
+.mark-bar {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
+.mark-bar-1 {
+  animation: mark-advance 2.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+.mark-bar-2 {
+  animation: mark-advance 2.8s cubic-bezier(0.45, 0, 0.2, 1) 0.18s infinite;
+}
+
+.mark-bar-3 {
+  animation: mark-advance 2.8s cubic-bezier(0.45, 0, 0.2, 1) 0.36s infinite;
+}
+
+@keyframes login-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes login-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-splash-in {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes login-enter-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes mark-advance {
+  0%,
+  12% {
+    transform: scaleX(0.55);
+  }
+  38%,
+  55% {
+    transform: scaleX(1);
+  }
+  78%,
+  100% {
+    transform: scaleX(0.55);
+  }
+}
+
+.live-chat-pulse {
+  box-shadow: inset 3px 0 0 0 var(--mint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-splash,
+  .login-auth,
+  .login-enter,
+  .mark-bar-1,
+  .mark-bar-2,
+  .mark-bar-3 {
+    animation: none;
+  }
+
+  .live-chat-rail .animate-ping {
+    animation: none;
+  }
 }
