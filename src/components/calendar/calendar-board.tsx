@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { formatZaDate } from "@/lib/opportunities/dates";
 import {
   EVENT_KINDS,
   type CalendarEvent,
   type EventKind,
 } from "@/lib/calendar/types";
+import {
+  isAutoClosingEvent,
+  opportunityIdFromAutoClosing,
+} from "@/lib/calendar/tender-closings";
 
 const kindLabel: Record<EventKind, string> = {
   meeting: "Meeting",
@@ -283,8 +288,9 @@ export function CalendarBoard() {
             Calendar
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Team meetings, reminders, briefings and closing deadlines — book
-            anything the bid team needs to see.
+            Team meetings, reminders and briefings — plus closing dates for
+            tenders and RFQs in your selected All Tenders categories, synced
+            automatically.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -650,20 +656,40 @@ export function CalendarBoard() {
                     <p className="mt-1 text-sm text-ink/80">{event.agenda}</p>
                   ) : null}
                   <div className="mt-3 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(event)}
-                      className="text-xs font-semibold text-navy hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeEvent(event.id)}
-                      className="text-xs font-semibold text-coral hover:underline"
-                    >
-                      Remove
-                    </button>
+                    {isAutoClosingEvent(event) ? (
+                      (() => {
+                        const oppId = opportunityIdFromAutoClosing(event.id);
+                        return oppId ? (
+                          <Link
+                            href={`/tenders/${oppId}`}
+                            className="text-xs font-semibold text-mint hover:underline"
+                          >
+                            Open tender
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted">
+                            Synced from All Tenders
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(event)}
+                          className="text-xs font-semibold text-navy hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeEvent(event.id)}
+                          className="text-xs font-semibold text-coral hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
                   </div>
                 </li>
               ))}
@@ -713,13 +739,31 @@ export function CalendarBoard() {
                         {event.attendees}
                       </p>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => openEdit(event)}
-                      className="mt-2 text-xs font-semibold text-mint hover:underline"
-                    >
-                      Edit
-                    </button>
+                    {isAutoClosingEvent(event) ? (
+                      (() => {
+                        const oppId = opportunityIdFromAutoClosing(event.id);
+                        return oppId ? (
+                          <Link
+                            href={`/tenders/${oppId}`}
+                            className="mt-2 inline-block text-xs font-semibold text-mint hover:underline"
+                          >
+                            Open tender
+                          </Link>
+                        ) : (
+                          <span className="mt-2 inline-block text-xs text-muted">
+                            Synced from All Tenders
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openEdit(event)}
+                        className="mt-2 text-xs font-semibold text-mint hover:underline"
+                      >
+                        Edit
+                      </button>
+                    )}
                   </div>
                   <div className="text-left md:text-right">
                     <div

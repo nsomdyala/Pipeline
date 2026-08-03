@@ -1,11 +1,31 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createEvent, listEvents } from "@/lib/calendar/store";
+import { mergeTenderClosings } from "@/lib/calendar/tender-closings";
 import { EVENT_KINDS, type EventKind } from "@/lib/calendar/types";
 import { createMessage, listChannels } from "@/lib/chat/store";
 
 export async function GET() {
-  return NextResponse.json({ events: await listEvents() });
+  try {
+    const stored = await listEvents();
+    const events = await mergeTenderClosings(stored);
+    return NextResponse.json({ events });
+  } catch (err) {
+    console.error("calendar list failed", err);
+    // Still return manual events if tender sync fails
+    try {
+      return NextResponse.json({ events: await listEvents() });
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            err instanceof Error ? err.message : "Could not load calendar.",
+          events: [],
+        },
+        { status: 500 },
+      );
+    }
+  }
 }
 
 export async function POST(request: Request) {

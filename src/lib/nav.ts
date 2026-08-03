@@ -15,7 +15,6 @@ export const navItems: NavItem[] = [
   { href: "/compliance", label: "Compliance", section: "company" },
   { href: "/proposals", label: "Proposals", section: "company" },
   { href: "/chat", label: "Chat", section: "collaborate" },
-  { href: "/discussions", label: "Discussions", section: "collaborate" },
   { href: "/calendar", label: "Calendar", section: "collaborate" },
   { href: "/settings", label: "Settings", section: "company" },
 ];
