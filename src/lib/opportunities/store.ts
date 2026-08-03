@@ -126,22 +126,35 @@ async function save(items: Opportunity[]) {
   await writeFile(DATA_FILE, JSON.stringify(items, null, 2), "utf8");
 }
 
+function usePostgres() {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
 export async function listOpportunities(options?: {
   scope?: "all" | "pipeline";
 }): Promise<Opportunity[]> {
+  if (usePostgres()) {
+    const { pgListOpportunities } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgListOpportunities(options);
+  }
   const items = await ensureStore();
   let list = items.map((i) => withOpportunityDefaults(i));
   if (options?.scope === "pipeline") {
     list = list.filter(isOnPipelineBoard);
   }
   return list.sort((a, b) => {
-    // Panels float above zero-value noise when closing dates are equal-ish
     if (a.isPanel !== b.isPanel) return a.isPanel ? -1 : 1;
     return new Date(a.closingAt).getTime() - new Date(b.closingAt).getTime();
   });
 }
 
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
+  if (usePostgres()) {
+    const { pgGetOpportunity } = await import("@/lib/opportunities/pg-store");
+    return pgGetOpportunity(id);
+  }
   const items = await ensureStore();
   const found = items.find((item) => item.id === id);
   return found ? withOpportunityDefaults(found) : null;
@@ -150,6 +163,12 @@ export async function getOpportunity(id: string): Promise<Opportunity | null> {
 export async function findByExternalId(
   externalId: string,
 ): Promise<Opportunity | null> {
+  if (usePostgres()) {
+    const { pgFindByExternalId } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgFindByExternalId(externalId);
+  }
   const items = await ensureStore();
   const found = items.find((item) => item.externalId === externalId);
   return found ? withOpportunityDefaults(found) : null;
@@ -159,6 +178,12 @@ export async function createOpportunity(
   input: CreateOpportunityInput,
   files: OpportunityFile[] = [],
 ): Promise<Opportunity> {
+  if (usePostgres()) {
+    const { pgCreateOpportunity } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgCreateOpportunity(input, files);
+  }
   const now = new Date().toISOString();
   const opportunity = withOpportunityDefaults({
     id: randomUUID(),
@@ -278,6 +303,50 @@ export async function updateOpportunityFromIntake(
   id: string,
   fields: IntakeUpsertFields,
 ): Promise<Opportunity | null> {
+  if (usePostgres()) {
+    const { pgUpdateOpportunity, pgGetOpportunity } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    const prev = await pgGetOpportunity(id);
+    if (!prev) return null;
+    const n = fields.normalised;
+    const matchedPipeline = !fields.lowRelevance && fields.lane !== "Other";
+    return pgUpdateOpportunity(id, {
+      refNo: n.refNo,
+      title: n.title,
+      description: n.description,
+      buyer: n.buyer,
+      sector: n.sector,
+      source: toOppSource(n.sourceLabel),
+      lane: fields.lane,
+      closingAt: n.closingAt ?? prev.closingAt,
+      briefingAt: n.briefing?.date ?? "",
+      briefingCompulsory: Boolean(n.briefing?.compulsory),
+      briefingVenue: n.briefing?.venue ?? "",
+      estimatedValueZar: n.estimatedValue,
+      sourceUrl: n.sourceUrl,
+      externalId: n.externalId,
+      contentHash: n.contentHash,
+      opportunityType: fields.opportunityType,
+      isPanel: fields.isPanel,
+      panelMaxParticipants: fields.panelMaxParticipants,
+      panelTerm: fields.panelTerm,
+      relevanceScore: fields.relevanceScore,
+      lowRelevance: fields.lowRelevance,
+      province: n.province,
+      category: n.category,
+      ocdsMainCategory: n.ocdsMainCategory,
+      matchVia: fields.matchVia,
+      documentLinks: n.documents,
+      contactName: n.contact?.name ?? null,
+      contactEmail: n.contact?.email ?? null,
+      contactPhone: n.contact?.telephone ?? null,
+      inPipeline: prev.inPipeline || matchedPipeline,
+      isAmended: true,
+      amendedAt: new Date().toISOString(),
+    });
+  }
+
   const items = await ensureStore();
   const index = items.findIndex((item) => item.id === id);
   if (index < 0) return null;
@@ -318,7 +387,6 @@ export async function updateOpportunityFromIntake(
     contactName: n.contact?.name ?? null,
     contactEmail: n.contact?.email ?? null,
     contactPhone: n.contact?.telephone ?? null,
-    // Never demote a manually promoted card on amendment
     inPipeline: prev.inPipeline || matchedPipeline,
     searchText: buildSearchText({
       title: n.title,
@@ -342,6 +410,12 @@ export async function updateOpportunityFromIntake(
 export async function promoteToPipeline(
   id: string,
 ): Promise<Opportunity | null> {
+  if (usePostgres()) {
+    const { pgPromoteToPipeline } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgPromoteToPipeline(id);
+  }
   const items = await ensureStore();
   const index = items.findIndex((item) => item.id === id);
   if (index < 0) return null;
@@ -360,6 +434,12 @@ export async function updateOpportunity(
   id: string,
   patch: Partial<Opportunity>,
 ): Promise<Opportunity | null> {
+  if (usePostgres()) {
+    const { pgUpdateOpportunity } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgUpdateOpportunity(id, patch);
+  }
   const items = await ensureStore();
   const index = items.findIndex((item) => item.id === id);
   if (index < 0) return null;

@@ -22,6 +22,9 @@ type SourcesBundle = {
 
 const FILE = "intake-sources.json";
 
+/** In-memory fallback when the filesystem is read-only (Vercel). */
+let memoryBundle: SourcesBundle | null = null;
+
 function seed(): SourcesBundle {
   return {
     sources: [
@@ -43,11 +46,24 @@ function seed(): SourcesBundle {
 }
 
 export async function getSourcesBundle() {
-  const existing = await readJsonFile<SourcesBundle | null>(FILE, null);
-  if (existing?.sources?.length) return existing;
-  const seeded = seed();
-  await writeJsonFile(FILE, seeded);
-  return seeded;
+  try {
+    const existing = await readJsonFile<SourcesBundle | null>(FILE, null);
+    if (existing?.sources?.length) {
+      memoryBundle = existing;
+      return existing;
+    }
+    const seeded = seed();
+    memoryBundle = seeded;
+    try {
+      await writeJsonFile(FILE, seeded);
+    } catch {
+      // read-only FS
+    }
+    return seeded;
+  } catch {
+    if (!memoryBundle) memoryBundle = seed();
+    return memoryBundle;
+  }
 }
 
 export async function getSource(key: string) {
@@ -77,10 +93,20 @@ export async function updateSource(
       ...patch,
     };
     bundle.sources.push(created);
-    await writeJsonFile(FILE, bundle);
+    memoryBundle = bundle;
+    try {
+      await writeJsonFile(FILE, bundle);
+    } catch {
+      // read-only FS
+    }
     return created;
   }
   bundle.sources[index] = { ...bundle.sources[index], ...patch };
-  await writeJsonFile(FILE, bundle);
+  memoryBundle = bundle;
+  try {
+    await writeJsonFile(FILE, bundle);
+  } catch {
+    // read-only FS
+  }
   return bundle.sources[index];
 }

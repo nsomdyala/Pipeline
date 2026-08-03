@@ -39,21 +39,25 @@ async function notifyOpportunity(opp: Opportunity, kind: "new" | "amended") {
   if (kind === "amended") return; // chatter only on new matched cards for now
   if (!shouldNotify(opp)) return;
 
-  const channels = await listChannels();
-  const channel =
-    channels.find((c) => c.name === "opportunities") ?? channels[0];
-  if (!channel) return;
+  try {
+    const channels = await listChannels();
+    const channel =
+      channels.find((c) => c.name === "opportunities") ?? channels[0];
+    if (!channel) return;
 
-  const prefix = opp.isPanel ? "PANEL · " : "";
-  const score =
-    opp.relevanceScore > 0 ? ` · relevance ${opp.relevanceScore}` : "";
-  const body = `${prefix}New ${opp.opportunityType.toUpperCase()} from ${opp.source}: ${opp.refNo} — ${opp.title} (${opp.buyer})${score}. Lane: ${opp.lane}.`;
+    const prefix = opp.isPanel ? "PANEL · " : "";
+    const score =
+      opp.relevanceScore > 0 ? ` · relevance ${opp.relevanceScore}` : "";
+    const body = `${prefix}New ${opp.opportunityType.toUpperCase()} from ${opp.source}: ${opp.refNo} — ${opp.title} (${opp.buyer})${score}. Lane: ${opp.lane}.`;
 
-  await createMessage({
-    channelId: channel.id,
-    authorName: "Pipeline Bot",
-    body,
-  });
+    await createMessage({
+      channelId: channel.id,
+      authorName: "Pipeline Bot",
+      body,
+    });
+  } catch {
+    // Chat is still file-backed — never fail intake because of notify.
+  }
 }
 
 function applyMatch(
@@ -131,7 +135,25 @@ export async function runIntake(
     return result;
   }
 
-  const settings = await getSettings();
+  let settings: {
+    keywords: { lane: string; terms: string[] }[];
+    categoryLaneMap: import("@/lib/intake/config/etenders-categories").CategoryLaneMapping[];
+  };
+  try {
+    const loaded = await getSettings();
+    settings = {
+      keywords: loaded.keywords,
+      categoryLaneMap: loaded.categoryLaneMap,
+    };
+  } catch {
+    const { DEFAULT_CATEGORY_LANE_MAP } = await import(
+      "@/lib/intake/config/etenders-categories"
+    );
+    settings = {
+      keywords: [],
+      categoryLaneMap: DEFAULT_CATEGORY_LANE_MAP,
+    };
+  }
 
   for (const raw of rawItems) {
     let normalised: NormalisedOpportunity;

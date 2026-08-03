@@ -151,8 +151,9 @@ export function AllTendersBoard() {
             All Tenders
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">
-            Our default categories load automatically. Use search to find RFQs,
-            tenders and RFPs outside those defaults. Open any row to view and
+            Defaults load automatically from our eTenders categories. Use{" "}
+            <span className="font-semibold text-ink">Search outside defaults</span>{" "}
+            for RFQs, tenders and RFPs in other categories. Open a row to view and
             download documents.
           </p>
         </div>
@@ -296,8 +297,8 @@ export function AllTendersBoard() {
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted">
                     {activeScope === "defaults"
-                      ? "No default-category tenders yet. Run eTenders intake from Opportunities."
-                      : "No RFQs / tenders / RFPs outside our defaults match this search."}
+                      ? "No default-category tenders yet. Wait for auto-pull, or run eTenders from Opportunities."
+                      : "No RFQs / tenders / RFPs outside our defaults match this search. Try clearing the type filter or include closed."}
                   </td>
                 </tr>
               ) : null}
