@@ -33,13 +33,17 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
     str(tender.procuringEntity?.name) ??
     "Unknown buyer";
 
-  const categoryParts = [
-    str(tender.mainProcurementCategory),
-    str(tender.classification?.description),
-    ...(tender.additionalProcurementCategories ?? []).map((c) => str(c)),
-  ].filter(Boolean) as string[];
+  // PRIMARY: official eTenders taxonomy on tender.category
+  // FALLBACK: coarse OCDS mainProcurementCategory / classification (rarely useful)
+  const etendersCategory = str(tender.category);
+  const ocdsMain =
+    str(tender.mainProcurementCategory) ??
+    (tender.additionalProcurementCategories ?? [])
+      .map((c) => str(c))
+      .find(Boolean) ??
+    str(tender.classification?.description);
+  const category = etendersCategory ?? ocdsMain ?? null;
 
-  const category = categoryParts.length ? categoryParts.join(" · ") : null;
   const amount = tender.value?.amount;
   const estimatedValue =
     typeof amount === "number" && Number.isFinite(amount) && amount > 0
@@ -86,6 +90,7 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
         title,
         description,
         buyer,
+        category,
         closingAt: tender.tenderPeriod?.endDate ?? null,
         amount: estimatedValue,
         province: tender.province ?? null,
@@ -109,6 +114,7 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
     publishedAt: str(raw.date),
     province: str(tender.province),
     category,
+    ocdsMainCategory: ocdsMain,
     estimatedValue,
     currency: str(tender.value?.currency) ?? "ZAR",
     documents,

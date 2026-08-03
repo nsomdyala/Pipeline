@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   formatZaDate,
@@ -16,6 +17,7 @@ import {
   type OppSource,
   type OppStage,
 } from "@/lib/opportunities/types";
+import type { SubmissionKind } from "@/lib/leads/types";
 
 type TypeFilter = "all" | OpportunityType;
 
@@ -68,6 +70,7 @@ export function OpportunitiesBoard() {
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [intakeStatus, setIntakeStatus] = useState<string | null>(null);
   const [runningIntake, setRunningIntake] = useState(false);
@@ -76,9 +79,9 @@ export function OpportunitiesBoard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/opportunities");
-        if (!res.ok) throw new Error("Failed to load opportunities.");
-        const data = (await res.json()) as { opportunities: Opportunity[] };
+        const oppRes = await fetch("/api/opportunities?scope=pipeline");
+        if (!oppRes.ok) throw new Error("Failed to load opportunities.");
+        const data = (await oppRes.json()) as { opportunities: Opportunity[] };
         if (!cancelled) setItems(data.opportunities);
       } catch {
         if (!cancelled) setError("Could not load opportunities.");
@@ -92,10 +95,13 @@ export function OpportunitiesBoard() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (typeFilter === "all") return items;
-    return items.filter(
-      (item) => item.opportunityType === typeFilter || (typeFilter === "panel" && item.isPanel),
-    );
+    return items.filter((item) => {
+      if (typeFilter === "all") return true;
+      return (
+        item.opportunityType === typeFilter ||
+        (typeFilter === "panel" && item.isPanel)
+      );
+    });
   }, [items, typeFilter]);
 
   const openCount = useMemo(
@@ -138,7 +144,7 @@ export function OpportunitiesBoard() {
           `eTenders ${r.status}: fetched ${r.fetched}, created ${r.created}, amended ${r.amended}` +
             (r.errors?.length ? ` · ${r.errors[0]}` : ""),
         );
-        const refresh = await fetch("/api/opportunities");
+        const refresh = await fetch("/api/opportunities?scope=pipeline");
         const body = (await refresh.json()) as { opportunities: Opportunity[] };
         setItems(body.opportunities);
       } catch (err) {
@@ -235,6 +241,43 @@ export function OpportunitiesBoard() {
     });
   }
 
+  function onSubmitToLeads(
+    opportunityId: string,
+    kind: SubmissionKind,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const selected = event.target.files;
+    if (!selected || selected.length === 0) return;
+    setMovingId(opportunityId);
+    setError(null);
+    startTransition(async () => {
+      try {
+        const body = new FormData();
+        body.set("kind", kind);
+        Array.from(selected).forEach((file) => body.append("files", file));
+        const res = await fetch(`/api/opportunities/${opportunityId}/to-lead`, {
+          method: "POST",
+          body,
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          throw new Error(data.error ?? "Could not move to Leads.");
+        }
+        setItems((prev) => prev.filter((item) => item.id !== opportunityId));
+        setIntakeStatus(
+          `${kind === "quotation" ? "Quotation" : "Pricing"} uploaded — moved to Leads.`,
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Could not move to Leads.",
+        );
+      } finally {
+        setMovingId(null);
+        event.target.value = "";
+      }
+    });
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 md:px-10">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -244,11 +287,17 @@ export function OpportunitiesBoard() {
             Opportunities
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Public intake from eTenders (OCDS), manual posts, and panel-aware
-            filtering. Panels stay visible even when value is blank.
+            Tick tenders from All Tenders into this board. When you submit,
+            upload the quotation or pricing to move it into Leads.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/tenders"
+            className="inline-flex items-center justify-center rounded-xl border border-navy/10 bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-mist"
+          >
+            All Tenders
+          </Link>
           <button
             type="button"
             onClick={runEtenders}
@@ -271,7 +320,7 @@ export function OpportunitiesBoard() {
       </header>
 
       {intakeStatus ? (
-        <p className="mb-4 text-xs font-semibold text-muted">{intakeStatus}</p>
+        <p className="mb-4 text-xs font-semibold text-mint">{intakeStatus}</p>
       ) : null}
 
       {open ? (
@@ -588,6 +637,11 @@ export function OpportunitiesBoard() {
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
                           {item.lane}
                         </span>
+                        {item.category ? (
+                          <span className="rounded-md bg-navy/5 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                            {item.category}
+                          </span>
+                        ) : null}
                         {item.isAmended ? (
                           <span className="rounded-md bg-coral/15 px-2 py-0.5 text-[0.65rem] font-semibold text-coral">
                             Amended
@@ -636,23 +690,59 @@ export function OpportunitiesBoard() {
                               </li>
                             ))}
                           </ul>
-                        ) : (
-                          <p className="text-xs text-muted">No files uploaded yet.</p>
-                        )}
-                        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-navy">
-                          <span className="rounded-lg bg-mist px-2.5 py-1.5 hover:bg-mint/15">
-                            {uploadingId === item.id
-                              ? "Uploading…"
-                              : "Upload information"}
-                          </span>
-                          <input
-                            type="file"
-                            multiple
-                            className="sr-only"
-                            disabled={uploadingId === item.id || pending}
-                            onChange={(e) => onUpload(item.id, e)}
-                          />
-                        </label>
+                        ) : null}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center text-xs font-semibold text-navy">
+                            <span className="rounded-lg bg-mist px-2.5 py-1.5 hover:bg-mint/15">
+                              {uploadingId === item.id
+                                ? "Uploading…"
+                                : "Attach docs"}
+                            </span>
+                            <input
+                              type="file"
+                              multiple
+                              className="sr-only"
+                              disabled={
+                                uploadingId === item.id ||
+                                movingId === item.id ||
+                                pending
+                              }
+                              onChange={(e) => onUpload(item.id, e)}
+                            />
+                          </label>
+                          <label className="inline-flex cursor-pointer items-center text-xs font-semibold text-navy">
+                            <span className="rounded-lg bg-mint/20 px-2.5 py-1.5 ring-1 ring-mint/40 hover:bg-mint/30">
+                              {movingId === item.id
+                                ? "Moving…"
+                                : "Upload quotation → Leads"}
+                            </span>
+                            <input
+                              type="file"
+                              multiple
+                              className="sr-only"
+                              disabled={movingId === item.id || pending}
+                              onChange={(e) =>
+                                onSubmitToLeads(item.id, "quotation", e)
+                              }
+                            />
+                          </label>
+                          <label className="inline-flex cursor-pointer items-center text-xs font-semibold text-navy">
+                            <span className="rounded-lg bg-mint/20 px-2.5 py-1.5 ring-1 ring-mint/40 hover:bg-mint/30">
+                              {movingId === item.id
+                                ? "Moving…"
+                                : "Upload pricing → Leads"}
+                            </span>
+                            <input
+                              type="file"
+                              multiple
+                              className="sr-only"
+                              disabled={movingId === item.id || pending}
+                              onChange={(e) =>
+                                onSubmitToLeads(item.id, "pricing", e)
+                              }
+                            />
+                          </label>
+                        </div>
                       </div>
                     </div>
 

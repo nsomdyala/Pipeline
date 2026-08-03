@@ -27,7 +27,7 @@ export async function GET(_request: Request, { params }: Params) {
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": file.mime,
-        "Content-Disposition": `inline; filename="${file.filename.replace(/"/g, "")}"`,
+        "Content-Disposition": `attachment; filename="${file.filename.replace(/"/g, "")}"`,
         "Content-Length": String(file.size),
       },
     });

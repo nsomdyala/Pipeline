@@ -45,7 +45,13 @@ export type NormalisedOpportunity = {
   closingAt: string | null;
   publishedAt: string | null;
   province: string | null;
+  /**
+   * Official eTenders `tender.category` label when present.
+   * Falls back to coarse OCDS mainProcurementCategory only if category is empty.
+   */
   category: string | null;
+  /** Coarse OCDS bucket: goods | services | works | consultingServices */
+  ocdsMainCategory: string | null;
   estimatedValue: number | null;
   currency: string | null;
   documents: NormalisedDocument[];

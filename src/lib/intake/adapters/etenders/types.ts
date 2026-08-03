@@ -39,8 +39,15 @@ export type OcdsTender = {
   description?: string;
   status?: string;
   procuringEntity?: { name?: string; id?: string };
+  /**
+   * Official eTenders SA category label (e.g. "Computer programming, consultancy…").
+   * This is the field we use for lane mapping — NOT mainProcurementCategory.
+   */
+  category?: string;
+  /** OCDS high-level: goods | services | works — too coarse for lane mapping. */
   mainProcurementCategory?: string;
   additionalProcurementCategories?: string[];
+  /** Unused on eTenders in practice (always null in samples). */
   classification?: { description?: string; id?: string; scheme?: string };
   province?: string;
   procurementMethod?: string;

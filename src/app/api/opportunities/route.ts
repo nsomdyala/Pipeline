@@ -16,8 +16,11 @@ import {
   type OppStage,
 } from "@/lib/opportunities/types";
 
-export async function GET() {
-  const opportunities = await listOpportunities();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const scope =
+    searchParams.get("scope") === "all" ? "all" : ("pipeline" as const);
+  const opportunities = await listOpportunities({ scope });
   return NextResponse.json({ opportunities });
 }
 

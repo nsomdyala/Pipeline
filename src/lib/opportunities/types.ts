@@ -1,3 +1,5 @@
+import { buildSearchText } from "@/lib/opportunities/search-text";
+
 export const OPP_LANES = [
   "ICT / IS",
   "Website",
@@ -88,11 +90,25 @@ export type Opportunity = {
   isAmended: boolean;
   amendedAt: string | null;
   province: string | null;
+  /** Official eTenders `tender.category` label (preferred). */
   category: string | null;
+  ocdsMainCategory: string | null;
+  matchVia: "category" | "keyword" | "none" | null;
   documentLinks: OpportunityDocumentLink[];
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  /**
+   * On the curated Opportunities board when true.
+   * Off-lane / low-relevance intake stays stored but inPipeline=false until promoted.
+   */
+  inPipeline: boolean;
+  /** Set when quotation/pricing is uploaded and the card moves to Leads. */
+  convertedToLeadId: string | null;
+  /** Set when the lead is appointed and becomes an Account. */
+  convertedToAccountId: string | null;
+  /** Denormalised blob for search (Postgres FTS / GIN later). */
+  searchText: string;
 };
 
 export type CreateOpportunityInput = {
@@ -121,10 +137,14 @@ export type CreateOpportunityInput = {
   lowRelevance?: boolean;
   province?: string | null;
   category?: string | null;
+  ocdsMainCategory?: string | null;
+  matchVia?: "category" | "keyword" | "none" | null;
   documentLinks?: OpportunityDocumentLink[];
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  inPipeline?: boolean;
+  searchText?: string;
 };
 
 /** Fill defaults for older persisted cards. */
@@ -149,8 +169,13 @@ export function withOpportunityDefaults(
   const opportunityType =
     item.opportunityType ?? (item.isPanel ? "panel" : "tender");
   const isPanel = item.isPanel ?? opportunityType === "panel";
+  const lowRelevance = item.lowRelevance ?? false;
+  const lane = item.lane;
+  const inPipeline =
+    item.inPipeline ??
+    ((!lowRelevance && lane !== "Other") || item.source === "Manual");
 
-  return {
+  const base = {
     description: item.description ?? "",
     briefingAt: item.briefingAt ?? "",
     briefingCompulsory: item.briefingCompulsory ?? false,
@@ -165,11 +190,13 @@ export function withOpportunityDefaults(
     panelMaxParticipants: item.panelMaxParticipants ?? null,
     panelTerm: item.panelTerm ?? null,
     relevanceScore: item.relevanceScore ?? 0,
-    lowRelevance: item.lowRelevance ?? false,
+    lowRelevance,
     isAmended: item.isAmended ?? false,
     amendedAt: item.amendedAt ?? null,
     province: item.province ?? null,
     category: item.category ?? null,
+    ocdsMainCategory: item.ocdsMainCategory ?? null,
+    matchVia: item.matchVia ?? null,
     documentLinks: item.documentLinks ?? [],
     contactName: item.contactName ?? null,
     contactEmail: item.contactEmail ?? null,
@@ -186,5 +213,24 @@ export function withOpportunityDefaults(
     ownerName: item.ownerName,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    inPipeline: Boolean(inPipeline),
+    convertedToLeadId: item.convertedToLeadId ?? null,
+    convertedToAccountId: item.convertedToAccountId ?? null,
+    searchText: "",
+  };
+
+  return {
+    ...base,
+    searchText:
+      item.searchText?.trim() ||
+      buildSearchText({
+        title: base.title,
+        description: base.description,
+        buyer: base.buyer,
+        refNo: base.refNo,
+        externalId: base.externalId,
+        province: base.province,
+        category: base.category,
+      }),
   };
 }

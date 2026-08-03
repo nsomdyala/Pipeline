@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  DEFAULT_CATEGORY_LANE_MAP,
+  defaultEtendersCategories,
+} from "@/lib/intake/config/etenders-categories";
 import { readJsonFile, writeJsonFile } from "@/lib/json-store";
 import type {
   AppUser,
@@ -104,12 +108,37 @@ function seed(): SettingsBundle {
         terms: ["solar", "PV", "photovoltaic", "electrical", "reticulation"],
       },
     ],
+    categoryLaneMap: DEFAULT_CATEGORY_LANE_MAP,
+    defaultEtendersCategories: defaultEtendersCategories(),
+  };
+}
+
+function withSettingsDefaults(bundle: SettingsBundle): SettingsBundle {
+  return {
+    ...bundle,
+    categoryLaneMap:
+      bundle.categoryLaneMap?.length > 0
+        ? bundle.categoryLaneMap
+        : DEFAULT_CATEGORY_LANE_MAP,
+    defaultEtendersCategories:
+      bundle.defaultEtendersCategories?.length > 0
+        ? bundle.defaultEtendersCategories
+        : defaultEtendersCategories(),
   };
 }
 
 export async function getSettings() {
   const existing = await readJsonFile<SettingsBundle | null>(FILE, null);
-  if (existing) return existing;
+  if (existing) {
+    const migrated = withSettingsDefaults(existing);
+    if (
+      !existing.categoryLaneMap?.length ||
+      !existing.defaultEtendersCategories?.length
+    ) {
+      await writeJsonFile(FILE, migrated);
+    }
+    return migrated;
+  }
   const seeded = seed();
   await writeJsonFile(FILE, seeded);
   return seeded;
@@ -118,6 +147,17 @@ export async function getSettings() {
 export async function saveCompany(company: CompanyProfile) {
   const settings = await getSettings();
   settings.company = company;
+  await writeJsonFile(FILE, settings);
+  return settings;
+}
+
+export async function saveCategoryConfig(input: {
+  categoryLaneMap: SettingsBundle["categoryLaneMap"];
+  defaultEtendersCategories: string[];
+}) {
+  const settings = await getSettings();
+  settings.categoryLaneMap = input.categoryLaneMap;
+  settings.defaultEtendersCategories = input.defaultEtendersCategories;
   await writeJsonFile(FILE, settings);
   return settings;
 }

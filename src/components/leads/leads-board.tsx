@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import {
   LEAD_LANES,
@@ -17,6 +18,7 @@ const sourceLabels: Record<LeadSource, string> = {
   portal: "Supplier portal",
   sap_bnd: "SAP Discovery",
   email: "Email",
+  submitted_bid: "Submitted bid",
 };
 
 const emptyForm: CreateLeadInput = {
@@ -47,6 +49,7 @@ export function LeadsBoard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
+  const [appointingId, setAppointingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +101,36 @@ export function LeadsBoard() {
     });
   }
 
+  function appoint(leadId: string) {
+    setAppointingId(leadId);
+    setError(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch(`/api/leads/${leadId}/appoint`, {
+          method: "POST",
+        });
+        const data = (await res.json()) as {
+          lead?: Lead;
+          error?: string;
+        };
+        if (!res.ok || !data.lead) {
+          throw new Error(data.error ?? "Could not appoint to Accounts.");
+        }
+        setLeads((prev) =>
+          prev.map((lead) => (lead.id === leadId ? data.lead! : lead)),
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not appoint to Accounts.",
+        );
+      } finally {
+        setAppointingId(null);
+      }
+    });
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 md:px-10">
       <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -107,8 +140,8 @@ export function LeadsBoard() {
             Leads
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Capture referrals, portal finds and early signals before they become
-            opportunities. Private wins usually start here.
+            Submitted tenders and RFQs land here with their quotation or pricing.
+            When you are appointed, move the lead into Accounts.
           </p>
         </div>
         <button
@@ -196,11 +229,13 @@ export function LeadsBoard() {
                 }
                 className="mt-1.5 w-full rounded-xl border border-navy/10 bg-mist/40 px-3 py-2.5 text-sm text-ink outline-none ring-mint/40 focus:bg-white focus:ring-2"
               >
-                {LEAD_SOURCES.map((source) => (
-                  <option key={source} value={source}>
-                    {sourceLabels[source]}
-                  </option>
-                ))}
+                {LEAD_SOURCES.filter((source) => source !== "submitted_bid").map(
+                  (source) => (
+                    <option key={source} value={source}>
+                      {sourceLabels[source]}
+                    </option>
+                  ),
+                )}
               </select>
             </label>
 
@@ -307,12 +342,22 @@ export function LeadsBoard() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      {lead.refNo ? (
+                        <span className="font-mono text-xs text-muted">
+                          {lead.refNo}
+                        </span>
+                      ) : null}
                       <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-muted">
                         {lead.sector}
                       </span>
                       <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
                         {sourceLabels[lead.source]}
                       </span>
+                      {lead.submissionKind ? (
+                        <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-navy">
+                          {lead.submissionKind}
+                        </span>
+                      ) : null}
                       <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
                         {lead.status}
                       </span>
@@ -331,6 +376,22 @@ export function LeadsBoard() {
                     {lead.notes ? (
                       <p className="mt-2 text-sm text-ink/80">{lead.notes}</p>
                     ) : null}
+                    {lead.files.length > 0 ? (
+                      <ul className="mt-2 space-y-1">
+                        {lead.files.map((file) => (
+                          <li key={file.id}>
+                            <a
+                              href={`/api/leads/${lead.id}/files/${file.id}`}
+                              className="text-sm font-semibold text-mint hover:underline"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {file.filename}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-left md:text-right">
                     <div className="label-mono">Logged</div>
@@ -340,6 +401,25 @@ export function LeadsBoard() {
                     <div className="mt-0.5 text-xs text-muted">
                       {lead.ownerName}
                     </div>
+                    {lead.accountId ? (
+                      <Link
+                        href="/accounts"
+                        className="mt-3 inline-block text-xs font-semibold text-mint hover:underline"
+                      >
+                        Open in Accounts
+                      </Link>
+                    ) : lead.status !== "lost" ? (
+                      <button
+                        type="button"
+                        onClick={() => appoint(lead.id)}
+                        disabled={appointingId === lead.id || pending}
+                        className="mt-3 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-navy disabled:opacity-60"
+                      >
+                        {appointingId === lead.id
+                          ? "Appointing…"
+                          : "Appointed → Accounts"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </li>

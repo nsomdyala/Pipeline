@@ -54,7 +54,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/opportunities");
+        const res = await fetch("/api/opportunities?scope=pipeline");
         const data = (await res.json()) as { opportunities: Opportunity[] };
         if (!cancelled) setOpportunities(data.opportunities ?? []);
       } finally {

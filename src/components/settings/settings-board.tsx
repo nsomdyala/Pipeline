@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { OPP_LANES, type OppLane } from "@/lib/opportunities/types";
 import {
   USER_ROLES,
   type AppUser,
@@ -9,6 +10,11 @@ import {
   type SettingsBundle,
   type UserRole,
 } from "@/lib/settings/types";
+
+type CategoryRow = {
+  etendersCategory: string;
+  lane: Exclude<OppLane, "Other">;
+};
 
 const roleLabel: Record<UserRole, string> = {
   admin: "Admin",
@@ -29,6 +35,8 @@ export function SettingsBoard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [saved, setSaved] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const [categoryRows, setCategoryRows] = useState<CategoryRow[]>([]);
+  const [categorySaved, setCategorySaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -37,8 +45,36 @@ export function SettingsBoard() {
       .then((d: SettingsBundle) => {
         setSettings(d);
         setCompany(d.company);
+        setCategoryRows(
+          (d.categoryLaneMap ?? []).map((row) => ({
+            etendersCategory: row.etendersCategory,
+            lane: row.lane,
+          })),
+        );
       });
   }, []);
+
+  function saveCategories(e: React.FormEvent) {
+    e.preventDefault();
+    startTransition(async () => {
+      const res = await fetch("/api/settings/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryLaneMap: categoryRows,
+          defaultEtendersCategories: categoryRows.map((r) => r.etendersCategory),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUserError(data.error ?? "Could not save categories.");
+        return;
+      }
+      setSettings(data);
+      setCategorySaved(true);
+      window.setTimeout(() => setCategorySaved(false), 2000);
+    });
+  }
 
   function saveCompany(e: React.FormEvent) {
     e.preventDefault();
@@ -329,6 +365,104 @@ export function SettingsBoard() {
           ))}
         </ul>
       </section>
+
+      <form
+        onSubmit={saveCategories}
+        className="mb-8 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-navy/5 md:p-6"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-ink">
+              eTenders category → lane map
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Official `tender.category` labels that feed the Opportunities board
+              defaults. Add rows here — no code change needed.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {categorySaved ? (
+              <span className="text-xs font-semibold text-mint">Saved</span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() =>
+                setCategoryRows((rows) => [
+                  ...rows,
+                  {
+                    etendersCategory: "",
+                    lane: "ICT / IS",
+                  },
+                ])
+              }
+              className="rounded-xl border border-navy/10 px-3 py-2 text-xs font-semibold text-navy"
+            >
+              Add category
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-navy disabled:opacity-60"
+            >
+              Save map
+            </button>
+          </div>
+        </div>
+        <ul className="mt-4 space-y-2">
+          {categoryRows.map((row, index) => (
+            <li
+              key={`${row.etendersCategory}-${index}`}
+              className="grid gap-2 md:grid-cols-[1fr_12rem_auto]"
+            >
+              <input
+                value={row.etendersCategory}
+                onChange={(e) =>
+                  setCategoryRows((rows) =>
+                    rows.map((r, i) =>
+                      i === index
+                        ? { ...r, etendersCategory: e.target.value }
+                        : r,
+                    ),
+                  )
+                }
+                placeholder="eTenders category label"
+                className="rounded-xl border border-navy/10 bg-mist/40 px-3 py-2 text-sm"
+              />
+              <select
+                value={row.lane}
+                onChange={(e) =>
+                  setCategoryRows((rows) =>
+                    rows.map((r, i) =>
+                      i === index
+                        ? {
+                            ...r,
+                            lane: e.target.value as Exclude<OppLane, "Other">,
+                          }
+                        : r,
+                    ),
+                  )
+                }
+                className="rounded-xl border border-navy/10 bg-mist/40 px-3 py-2 text-sm"
+              >
+                {OPP_LANES.filter((l) => l !== "Other").map((lane) => (
+                  <option key={lane} value={lane}>
+                    {lane}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() =>
+                  setCategoryRows((rows) => rows.filter((_, i) => i !== index))
+                }
+                className="text-xs font-semibold text-coral"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      </form>
 
       <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-navy/5 md:p-6">
         <h2 className="text-base font-semibold text-ink">

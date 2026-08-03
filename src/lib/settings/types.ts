@@ -1,3 +1,5 @@
+import type { CategoryLaneMapping } from "@/lib/intake/config/etenders-categories";
+
 export type CompanyProfile = {
   name: string;
   tradingAs: string;
@@ -34,4 +36,8 @@ export type SettingsBundle = {
   users: AppUser[];
   portals: PortalWatchItem[];
   keywords: { lane: string; terms: string[] }[];
+  /** Official eTenders category → lane; edit here to add/remove without code changes. */
+  categoryLaneMap: CategoryLaneMapping[];
+  /** Pre-selected categories for board / All Tenders filters. */
+  defaultEtendersCategories: string[];
 };

@@ -3,6 +3,8 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { NormalisedOpportunity } from "@/lib/intake/types";
 import { seedOpportunities } from "@/lib/opportunities/seed";
+import { buildSearchText } from "@/lib/opportunities/search-text";
+import { isOnPipelineBoard } from "@/lib/opportunities/search";
 import {
   OPP_SOURCES,
   withOpportunityDefaults,
@@ -55,13 +57,42 @@ function migrate(items: Opportunity[]) {
   const seeded = seedOpportunities();
   let changed = ownersChanged;
 
+  // Keep demo submissions visible on the team hub
+  for (const seedId of ["seed-gep-web", "seed-sap-private"] as const) {
+    const existing = byId.get(seedId);
+    const seed = seeded.find((s) => s.id === seedId);
+    if (existing && seed && existing.stage !== "Submitted") {
+      byId.set(seedId, {
+        ...existing,
+        stage: "Submitted",
+        estimatedValueZar: seed.estimatedValueZar,
+      });
+      changed = true;
+    }
+  }
+
   for (const seed of seeded) {
     if (
       seed.id === "seed-etenders-ict-rfq" ||
       seed.id === "seed-etenders-ict-panel"
     ) {
-      if (!byId.has(seed.id)) {
+      const existing = byId.get(seed.id);
+      if (!existing) {
         byId.set(seed.id, seed);
+        changed = true;
+      } else if (
+        existing.category !== seed.category ||
+        existing.matchVia !== seed.matchVia
+      ) {
+        byId.set(seed.id, {
+          ...existing,
+          category: seed.category,
+          ocdsMainCategory: seed.ocdsMainCategory,
+          matchVia: seed.matchVia,
+          lane: seed.lane,
+          inPipeline: seed.inPipeline,
+          contentHash: seed.contentHash,
+        });
         changed = true;
       }
     }
@@ -95,15 +126,19 @@ async function save(items: Opportunity[]) {
   await writeFile(DATA_FILE, JSON.stringify(items, null, 2), "utf8");
 }
 
-export async function listOpportunities(): Promise<Opportunity[]> {
+export async function listOpportunities(options?: {
+  scope?: "all" | "pipeline";
+}): Promise<Opportunity[]> {
   const items = await ensureStore();
-  return items
-    .map((i) => withOpportunityDefaults(i))
-    .sort((a, b) => {
-      // Panels float above zero-value noise when closing dates are equal-ish
-      if (a.isPanel !== b.isPanel) return a.isPanel ? -1 : 1;
-      return new Date(a.closingAt).getTime() - new Date(b.closingAt).getTime();
-    });
+  let list = items.map((i) => withOpportunityDefaults(i));
+  if (options?.scope === "pipeline") {
+    list = list.filter(isOnPipelineBoard);
+  }
+  return list.sort((a, b) => {
+    // Panels float above zero-value noise when closing dates are equal-ish
+    if (a.isPanel !== b.isPanel) return a.isPanel ? -1 : 1;
+    return new Date(a.closingAt).getTime() - new Date(b.closingAt).getTime();
+  });
 }
 
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
@@ -158,10 +193,25 @@ export async function createOpportunity(
     lowRelevance: input.lowRelevance ?? false,
     province: input.province ?? null,
     category: input.category ?? null,
+    ocdsMainCategory: input.ocdsMainCategory ?? null,
+    matchVia: input.matchVia ?? null,
     documentLinks: input.documentLinks ?? [],
     contactName: input.contactName ?? null,
     contactEmail: input.contactEmail ?? null,
     contactPhone: input.contactPhone ?? null,
+    inPipeline:
+      input.inPipeline ??
+      (input.source === "Manual" ||
+        (!(input.lowRelevance ?? false) && input.lane !== "Other")),
+    searchText: buildSearchText({
+      title: input.title.trim(),
+      description: input.description?.trim() ?? "",
+      buyer: input.buyer.trim(),
+      refNo: input.refNo.trim(),
+      externalId: input.externalId,
+      province: input.province,
+      category: input.category,
+    }),
   });
 
   const items = await ensureStore();
@@ -175,6 +225,7 @@ type IntakeUpsertFields = {
   lane: OppLane;
   relevanceScore: number;
   lowRelevance: boolean;
+  matchVia: "category" | "keyword" | "none";
   opportunityType: OpportunityType;
   isPanel: boolean;
   panelMaxParticipants: number | null;
@@ -185,6 +236,8 @@ export async function createOpportunityFromIntake(
   fields: IntakeUpsertFields,
 ): Promise<Opportunity> {
   const { normalised: n } = fields;
+  // Lane is a TAG — every release is stored. Board only shows inPipeline.
+  const inPipeline = !fields.lowRelevance && fields.lane !== "Other";
   return createOpportunity({
     refNo: n.refNo,
     title: n.title,
@@ -211,10 +264,13 @@ export async function createOpportunityFromIntake(
     lowRelevance: fields.lowRelevance,
     province: n.province,
     category: n.category,
+    ocdsMainCategory: n.ocdsMainCategory,
+    matchVia: fields.matchVia,
     documentLinks: n.documents,
     contactName: n.contact?.name ?? null,
     contactEmail: n.contact?.email ?? null,
     contactPhone: n.contact?.telephone ?? null,
+    inPipeline,
   });
 }
 
@@ -230,6 +286,7 @@ export async function updateOpportunityFromIntake(
   const now = new Date().toISOString();
   const prev = withOpportunityDefaults(items[index]);
 
+  const matchedPipeline = !fields.lowRelevance && fields.lane !== "Other";
   items[index] = withOpportunityDefaults({
     ...prev,
     refNo: n.refNo,
@@ -255,15 +312,63 @@ export async function updateOpportunityFromIntake(
     lowRelevance: fields.lowRelevance,
     province: n.province,
     category: n.category,
+    ocdsMainCategory: n.ocdsMainCategory,
+    matchVia: fields.matchVia,
     documentLinks: n.documents,
     contactName: n.contact?.name ?? null,
     contactEmail: n.contact?.email ?? null,
     contactPhone: n.contact?.telephone ?? null,
+    // Never demote a manually promoted card on amendment
+    inPipeline: prev.inPipeline || matchedPipeline,
+    searchText: buildSearchText({
+      title: n.title,
+      description: n.description,
+      buyer: n.buyer,
+      refNo: n.refNo,
+      externalId: n.externalId,
+      province: n.province,
+      category: n.category,
+    }),
     isAmended: true,
     amendedAt: now,
     updatedAt: now,
   });
 
+  await save(items);
+  return items[index];
+}
+
+/** Promote an off-lane / archive tender onto the curated Opportunities board. */
+export async function promoteToPipeline(
+  id: string,
+): Promise<Opportunity | null> {
+  const items = await ensureStore();
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  const now = new Date().toISOString();
+  const prev = withOpportunityDefaults(items[index]);
+  items[index] = withOpportunityDefaults({
+    ...prev,
+    inPipeline: true,
+    updatedAt: now,
+  });
+  await save(items);
+  return items[index];
+}
+
+export async function updateOpportunity(
+  id: string,
+  patch: Partial<Opportunity>,
+): Promise<Opportunity | null> {
+  const items = await ensureStore();
+  const index = items.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  const prev = withOpportunityDefaults(items[index]);
+  items[index] = withOpportunityDefaults({
+    ...prev,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  });
   await save(items);
   return items[index];
 }

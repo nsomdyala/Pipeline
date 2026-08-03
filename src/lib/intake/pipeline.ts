@@ -58,9 +58,17 @@ async function notifyOpportunity(opp: Opportunity, kind: "new" | "amended") {
 
 function applyMatch(
   normalised: NormalisedOpportunity,
-  keywordConfig: { lane: string; terms: string[] }[],
+  settings: {
+    keywords: { lane: string; terms: string[] }[];
+    categoryLaneMap: import("@/lib/intake/config/etenders-categories").CategoryLaneMapping[];
+  },
 ) {
-  const lane = matchLanes(normalised.matchText, keywordConfig);
+  const lane = matchLanes({
+    etendersCategory: normalised.category,
+    matchText: normalised.matchText,
+    categoryLaneMap: settings.categoryLaneMap,
+    keywords: settings.keywords,
+  });
   const panel = matchPanel(normalised);
   return { lane, panel };
 }
@@ -68,6 +76,9 @@ function applyMatch(
 /**
  * Shared intake pipeline: fetch → normalise → dedupe → match → upsert → notify.
  * Source-specific logic stays inside the adapter.
+ *
+ * Every release is stored (lane is a TAG). Off-lane / low-relevance items get
+ * inPipeline=false and appear in All Tenders until promoted.
  */
 export async function runIntake(
   adapter: SourceAdapter,
@@ -135,7 +146,7 @@ export async function runIntake(
     }
 
     try {
-      const { lane, panel } = applyMatch(normalised, settings.keywords);
+      const { lane, panel } = applyMatch(normalised, settings);
       const existing = await findByExternalId(normalised.externalId);
 
       if (!existing) {
@@ -144,6 +155,7 @@ export async function runIntake(
           lane: lane.lane,
           relevanceScore: lane.relevanceScore,
           lowRelevance: lane.lowRelevance,
+          matchVia: lane.matchVia,
           opportunityType: panel.opportunityType,
           isPanel: panel.isPanel,
           panelMaxParticipants: panel.panelMaxParticipants,
@@ -167,6 +179,7 @@ export async function runIntake(
         lane: lane.lane,
         relevanceScore: lane.relevanceScore,
         lowRelevance: lane.lowRelevance,
+        matchVia: lane.matchVia,
         opportunityType: panel.opportunityType,
         isPanel: panel.isPanel,
         panelMaxParticipants: panel.panelMaxParticipants,

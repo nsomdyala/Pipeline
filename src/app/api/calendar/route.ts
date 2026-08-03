@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth/session";
 import { createEvent, listEvents } from "@/lib/calendar/store";
 import { EVENT_KINDS, type EventKind } from "@/lib/calendar/types";
+import { createMessage, listChannels } from "@/lib/chat/store";
 
 export async function GET() {
   return NextResponse.json({ events: await listEvents() });
@@ -16,7 +18,10 @@ export async function POST(request: Request) {
     agenda?: string;
     linkedTo?: string;
     attendees?: string;
+    allDay?: boolean;
+    notifyTeam?: boolean;
   };
+
   if (!body.title?.trim() || !body.startsAt) {
     return NextResponse.json(
       { error: "Title and start time are required." },
@@ -26,6 +31,8 @@ export async function POST(request: Request) {
   if (!EVENT_KINDS.includes(body.kind as EventKind)) {
     return NextResponse.json({ error: "Invalid event kind." }, { status: 400 });
   }
+
+  const session = await getSession();
   const event = await createEvent({
     kind: body.kind as EventKind,
     title: body.title,
@@ -35,6 +42,34 @@ export async function POST(request: Request) {
     agenda: body.agenda,
     linkedTo: body.linkedTo,
     attendees: body.attendees,
+    createdBy: session?.name,
+    allDay: body.allDay,
   });
+
+  if (body.notifyTeam !== false) {
+    try {
+      const channels = await listChannels();
+      const channel =
+        channels.find((c) => c.name === "general") ?? channels[0];
+      if (channel) {
+        const when = new Intl.DateTimeFormat("en-ZA", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Africa/Johannesburg",
+        }).format(new Date(event.startsAt));
+        await createMessage({
+          channelId: channel.id,
+          authorName: "Pipeline Bot",
+          body: `Calendar · ${event.kind.toUpperCase()}: ${event.title} — ${when}${event.attendees ? ` · ${event.attendees}` : ""}`,
+        });
+      }
+    } catch {
+      // chat notify is best-effort
+    }
+  }
+
   return NextResponse.json({ event }, { status: 201 });
 }
