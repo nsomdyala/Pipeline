@@ -79,13 +79,16 @@ export function AllTendersBoard() {
   }, [load]);
 
   function browseDefaults() {
-    if (!draft) return;
-    load({
-      ...draft,
+    const next: Filters = {
       q: "",
+      type: "all",
+      buyer: "",
+      includeClosed: false,
       scope: "defaults",
       page: 1,
-    });
+    };
+    setDraft(next);
+    load(next);
   }
 
   function searchBeyond(event: React.FormEvent) {
@@ -96,6 +99,18 @@ export function AllTendersBoard() {
       scope: "beyond_defaults",
       page: 1,
     });
+  }
+
+  function applyDraft(patch: Partial<Filters>) {
+    if (!draft) return;
+    const next: Filters = {
+      ...draft,
+      ...patch,
+      scope: filters?.scope ?? draft.scope,
+      page: 1,
+    };
+    setDraft(next);
+    load(next);
   }
 
   function promote(item: Opportunity, event: React.MouseEvent) {
@@ -195,9 +210,7 @@ export function AllTendersBoard() {
             <button
               key={value}
               type="button"
-              onClick={() =>
-                setDraft((d) => (d ? { ...d, type: value } : d))
-              }
+              onClick={() => applyDraft({ type: value })}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
                 draft.type === value
                   ? "bg-navy text-white"
@@ -225,11 +238,7 @@ export function AllTendersBoard() {
             <input
               type="checkbox"
               checked={draft.includeClosed}
-              onChange={(e) =>
-                setDraft((d) =>
-                  d ? { ...d, includeClosed: e.target.checked } : d,
-                )
-              }
+              onChange={(e) => applyDraft({ includeClosed: e.target.checked })}
               className="size-4 rounded border-navy/20 text-mint"
             />
             <span className="text-sm text-ink">Include closed / awarded</span>
@@ -249,10 +258,16 @@ export function AllTendersBoard() {
           <button
             type="button"
             onClick={browseDefaults}
-            disabled={pending}
-            className="rounded-xl border border-navy/10 bg-white px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+            disabled={pending && activeScope === "defaults"}
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${
+              activeScope === "defaults"
+                ? "bg-navy text-white"
+                : "border border-navy/10 bg-white text-navy"
+            }`}
           >
-            Show our defaults
+            {pending && activeScope === "defaults"
+              ? "Loading defaults…"
+              : "Show our defaults"}
           </button>
           <span className="font-mono text-xs text-muted">
             {result
