@@ -107,7 +107,9 @@ export function SettingsBoard() {
         setUserError(data.error ?? "Could not add user.");
         return;
       }
-      setSettings(data.settings);
+      setSettings((prev) =>
+        prev && data.users ? { ...prev, users: data.users } : prev,
+      );
       setUserForm(emptyUser);
       setShowAddUser(false);
     });
@@ -125,7 +127,9 @@ export function SettingsBoard() {
         setUserError(data.error ?? "Could not update role.");
         return;
       }
-      setSettings(data.settings);
+      setSettings((prev) =>
+        prev && data.users ? { ...prev, users: data.users } : prev,
+      );
     });
   }
 
@@ -142,7 +146,9 @@ export function SettingsBoard() {
         setUserError(data.error ?? "Could not remove user.");
         return;
       }
-      setSettings(data.settings);
+      setSettings((prev) =>
+        prev && data.users ? { ...prev, users: data.users } : prev,
+      );
     });
   }
 

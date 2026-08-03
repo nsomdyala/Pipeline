@@ -5,12 +5,15 @@ import { useEffect, useState, useTransition } from "react";
 import { PipelineMark } from "@/components/brand/pipeline-mark";
 
 type Phase = "splash" | "auth" | "enter";
+type Mode = "login" | "register";
 
 export function LoginLanding() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phase, setPhase] = useState<Phase>("splash");
-  const [email, setEmail] = useState("nsomdyala@maxattention.tech");
+  const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -24,14 +27,21 @@ export function LoginLanding() {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await fetch("/api/auth/login", {
+      const endpoint =
+        mode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const body =
+        mode === "register"
+          ? { name, email, password }
+          : { email, password };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Could not sign in.");
+        setError(data.error ?? "Could not continue.");
         return;
       }
 
@@ -62,7 +72,49 @@ export function LoginLanding() {
               <PipelineMark size={56} animated />
             </div>
 
+            <div className="mb-4 flex rounded-full bg-white/5 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+                className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold ${
+                  mode === "login" ? "bg-mint text-navy" : "text-white/60"
+                }`}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError(null);
+                }}
+                className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold ${
+                  mode === "register" ? "bg-mint text-navy" : "text-white/60"
+                }`}
+              >
+                Create account
+              </button>
+            </div>
+
             <form onSubmit={onSubmit} className="space-y-4">
+              {mode === "register" ? (
+                <label className="block">
+                  <span className="label-mono text-white/45">Full name</span>
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-mint/60 focus:bg-white/[0.09]"
+                    placeholder="Your name"
+                  />
+                </label>
+              ) : null}
+
               <label className="block">
                 <span className="label-mono text-white/45">Work email</span>
                 <input
@@ -72,7 +124,7 @@ export function LoginLanding() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-2 w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-mint/60 focus:bg-white/[0.09]"
-                  placeholder="you@maxattention.tech"
+                  placeholder="you@company.com"
                 />
               </label>
 
@@ -80,13 +132,18 @@ export function LoginLanding() {
                 <span className="label-mono text-white/45">Password</span>
                 <input
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete={
+                    mode === "register" ? "new-password" : "current-password"
+                  }
                   required
+                  minLength={mode === "register" ? 8 : undefined}
                   autoFocus
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="mt-2 w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-mint/60 focus:bg-white/[0.09]"
-                  placeholder="Pipeline"
+                  placeholder={
+                    mode === "register" ? "At least 8 characters" : "Password"
+                  }
                 />
               </label>
 
@@ -101,7 +158,13 @@ export function LoginLanding() {
                 disabled={pending}
                 className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-mint px-5 py-3.5 text-sm font-semibold text-navy transition hover:brightness-105 disabled:opacity-60"
               >
-                {pending ? "Signing in…" : "Sign in"}
+                {pending
+                  ? mode === "register"
+                    ? "Creating…"
+                    : "Signing in…"
+                  : mode === "register"
+                    ? "Create account"
+                    : "Sign in"}
               </button>
             </form>
           </div>
