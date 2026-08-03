@@ -1,4 +1,4 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   DEFAULT_CATEGORY_LANE_MAP,
   defaultEtendersCategories,
@@ -12,7 +12,7 @@ import {
 import { OPP_LANES, type OppLane } from "@/lib/opportunities/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 15;
 
 function parseBool(value: string | null): boolean | null {
   if (value === "true" || value === "1") return true;
@@ -44,7 +44,6 @@ function emptyPayload(error: string) {
 }
 
 async function resolveDefaultCategories(): Promise<string[]> {
-  // Prefer in-memory defaults so Vercel never depends on .data/settings.json
   try {
     if (process.env.DATABASE_URL) {
       return defaultEtendersCategories();
@@ -60,39 +59,10 @@ async function resolveDefaultCategories(): Promise<string[]> {
   return defaultEtendersCategories();
 }
 
-function scheduleBackgroundIntake() {
-  // Never await intake in the search request — a 3-day eTenders pull can exceed
-  // Vercel limits and the platform then returns plain text ("An error occurred…")
-  // instead of our JSON error envelope.
-  after(async () => {
-    try {
-      const { runEtendersIntake } = await import("@/lib/intake/pipeline");
-      const to = new Date();
-      const from = new Date();
-      from.setDate(from.getDate() - 3);
-      const fmt = (d: Date) =>
-        new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Africa/Johannesburg",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(d);
-      const result = await runEtendersIntake({
-        dateFrom: fmt(from),
-        dateTo: fmt(to),
-      });
-      console.info("background eTenders intake finished", {
-        status: result.status,
-        fetched: result.fetched,
-        created: result.created,
-        errors: result.errors.slice(0, 3),
-      });
-    } catch (err) {
-      console.error("background eTenders intake failed", err);
-    }
-  });
-}
-
+/**
+ * All Tenders search — Postgres only. Never talks to eTenders.
+ * Intake is exclusively via /api/cron/intake/etenders (and manual intake API).
+ */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -146,14 +116,12 @@ export async function GET(request: Request) {
       return NextResponse.json(emptyPayload(message), { status: 500 });
     }
 
-    let notice: string | undefined;
-    if (all.length === 0 && process.env.DATABASE_URL) {
-      scheduleBackgroundIntake();
-      notice =
-        "No tenders in the database yet — a background eTenders pull has been started. Refresh in a minute.";
-    }
-
     const result = searchTenders(all, query);
+    const notice =
+      all.length === 0
+        ? "No tenders synced yet. The scheduled eTenders intake job will populate this list — it is not fetched on page load."
+        : undefined;
+
     return NextResponse.json({
       ...result,
       scope,

@@ -7,7 +7,7 @@ import {
   formatZaDate,
   workingDaysUntil,
 } from "@/lib/opportunities/dates";
-import { readJsonResponse } from "@/lib/http/read-json";
+import { fetchJson } from "@/lib/http/fetch-json";
 import {
   deriveTenderStatus,
   type TenderSearchResult,
@@ -58,8 +58,10 @@ export function AllTendersBoard() {
 
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/tenders/search?${params}`);
-        const parsed = await readJsonResponse<SearchPayload>(res);
+        const parsed = await fetchJson<SearchPayload>(
+          `/api/tenders/search?${params}`,
+          { timeoutMs: 10_000 },
+        );
         if (!parsed.ok) {
           throw new Error(parsed.error);
         }
@@ -321,7 +323,10 @@ export function AllTendersBoard() {
               {loading && !result ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                    Loading tenders…
+                    <div className="font-semibold text-ink">Loading tenders…</div>
+                    <div className="mt-1 text-xs">
+                      Querying Pipeline database only
+                    </div>
                   </td>
                 </tr>
               ) : null}

@@ -1,9 +1,12 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
-import { dataPath } from "@/lib/json-store";
 import { getOpportunity } from "@/lib/opportunities/store";
-import { enrichTenderDocuments } from "@/lib/tenders/enrich-documents";
+import {
+  readDocumentCache,
+  writeDocumentCache,
+} from "@/lib/tenders/document-cache";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ id: string; docIndex: string }> };
 
@@ -36,84 +39,66 @@ function guessMime(format: string | undefined, filename: string) {
   return "application/octet-stream";
 }
 
-function cachePaths(opportunityId: string, index: number, filename: string) {
-  const dir = dataPath("tender-docs", opportunityId);
-  const stored = `${index}-${safeFilename(filename)}`;
-  return {
-    dir,
-    filePath: path.join(dir, stored),
-    metaPath: path.join(dir, `${index}.meta.json`),
-  };
-}
-
+/**
+ * Lazy document download: only hits etenders.gov.za when the user clicks Download.
+ * Cached in Supabase Storage (or local /tmp fallback) for instant repeat opens.
+ * Does NOT call the OCDS API to discover documents — uses links stored at intake.
+ */
 export async function GET(_request: Request, { params }: Params) {
-  const { id, docIndex } = await params;
-  const index = Number(docIndex);
-  if (!Number.isInteger(index) || index < 0) {
-    return NextResponse.json({ error: "Invalid document." }, { status: 400 });
-  }
-
-  let opportunity = await getOpportunity(id);
-  if (!opportunity) {
-    return NextResponse.json({ error: "Tender not found." }, { status: 404 });
-  }
-
-  if (!opportunity.documentLinks[index]) {
-    opportunity = await enrichTenderDocuments(opportunity);
-  }
-
-  const doc = opportunity.documentLinks[index];
-  if (!doc?.url) {
-    return NextResponse.json(
-      {
-        error:
-          "No downloadable document is listed for this tender yet. Try again shortly, or open the eTenders release link from the tender page.",
-      },
-      { status: 404 },
-    );
-  }
-
-  let remote: URL;
   try {
-    remote = new URL(doc.url);
-  } catch {
-    return NextResponse.json({ error: "Invalid document URL." }, { status: 400 });
-  }
-
-  if (!isAllowedHost(remote.hostname)) {
-    return NextResponse.json(
-      { error: "Document host is not allowed." },
-      { status: 400 },
-    );
-  }
-
-  const filename = safeFilename(doc.title || `document-${index + 1}.pdf`);
-  const { dir, filePath, metaPath } = cachePaths(id, index, filename);
-
-  try {
-    const cached = await readFile(filePath);
-    let contentType = guessMime(doc.format, filename);
-    try {
-      const meta = JSON.parse(await readFile(metaPath, "utf8")) as {
-        contentType?: string;
-      };
-      if (meta.contentType) contentType = meta.contentType;
-    } catch {
-      // no meta
+    const { id, docIndex } = await params;
+    const index = Number(docIndex);
+    if (!Number.isInteger(index) || index < 0) {
+      return NextResponse.json({ error: "Invalid document." }, { status: 400 });
     }
-    return new NextResponse(cached, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "Content-Length": String(cached.length),
-        "Cache-Control": "private, max-age=86400",
-      },
-    });
-  } catch {
-    // not cached yet — fetch once and store
-  }
 
-  try {
+    const opportunity = await getOpportunity(id);
+    if (!opportunity) {
+      return NextResponse.json({ error: "Tender not found." }, { status: 404 });
+    }
+
+    const doc = opportunity.documentLinks[index];
+    if (!doc?.url) {
+      return NextResponse.json(
+        {
+          error:
+            "No downloadable document was stored for this tender at sync time. Wait for the next intake run.",
+        },
+        { status: 404 },
+      );
+    }
+
+    let remote: URL;
+    try {
+      remote = new URL(doc.url);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid document URL." },
+        { status: 400 },
+      );
+    }
+
+    if (!isAllowedHost(remote.hostname)) {
+      return NextResponse.json(
+        { error: "Document host is not allowed." },
+        { status: 400 },
+      );
+    }
+
+    const filename = safeFilename(doc.title || `document-${index + 1}.pdf`);
+    const cached = await readDocumentCache(opportunity.id, index);
+    if (cached) {
+      return new NextResponse(new Uint8Array(cached.buffer), {
+        headers: {
+          "Content-Type": cached.contentType,
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": String(cached.buffer.length),
+          "Cache-Control": "private, max-age=86400",
+          "X-Pipeline-Cache": "hit",
+        },
+      });
+    }
+
     const upstream = await fetch(remote.toString(), {
       headers: {
         Accept: "application/pdf,application/octet-stream,*/*",
@@ -123,6 +108,7 @@ export async function GET(_request: Request, { params }: Params) {
       },
       redirect: "follow",
       cache: "no-store",
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!upstream.ok) {
@@ -143,34 +129,25 @@ export async function GET(_request: Request, { params }: Params) {
     const contentType =
       upstream.headers.get("content-type") || guessMime(doc.format, filename);
 
-    try {
-      await mkdir(dir, { recursive: true });
-      await writeFile(filePath, buffer);
-      await writeFile(
-        metaPath,
-        JSON.stringify({
-          contentType,
-          sourceUrl: doc.url,
-          cachedAt: new Date().toISOString(),
-        }),
-        "utf8",
-      );
-    } catch {
-      // cache is best-effort (e.g. read-only FS) — still return the file
-    }
+    await writeDocumentCache(opportunity.id, index, buffer, contentType);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Content-Length": String(buffer.length),
         "Cache-Control": "private, max-age=86400",
+        "X-Pipeline-Cache": "miss",
       },
     });
-  } catch {
-    return NextResponse.json(
-      { error: "Could not download the document. Try again in a moment." },
-      { status: 502 },
-    );
+  } catch (err) {
+    console.error("tender document download failed", err);
+    const message =
+      err instanceof Error && err.name === "TimeoutError"
+        ? "Document download timed out. Try again."
+        : err instanceof Error
+          ? err.message
+          : "Could not download the document.";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { fetchJson } from "@/lib/http/fetch-json";
 import {
   formatZaDate,
   formatZar,
@@ -20,40 +21,56 @@ export function TenderDetail({ id }: { id: string }) {
   const router = useRouter();
   const [item, setItem] = useState<Opportunity | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notSynced, setNotSynced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [promoting, setPromoting] = useState(false);
-  const [refreshingDocs, setRefreshingDocs] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/tenders/${id}`);
-    const data = (await res.json()) as {
-      opportunity?: Opportunity;
-      error?: string;
-    };
-    if (!res.ok || !data.opportunity) {
-      throw new Error(data.error ?? "Tender not found.");
-    }
-    setItem(data.opportunity);
-  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        await load();
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load tender.");
+      setLoading(true);
+      setError(null);
+      setNotSynced(false);
+      const parsed = await fetchJson<{
+        opportunity?: Opportunity;
+        error?: string;
+        code?: string;
+      }>(`/api/tenders/${encodeURIComponent(id)}`, { timeoutMs: 8_000 });
+
+      if (cancelled) return;
+
+      if (!parsed.ok) {
+        if (parsed.status === 404) {
+          setNotSynced(true);
+          setError(
+            parsed.error ||
+              "This tender is not in Pipeline yet. Wait for the next scheduled sync.",
+          );
+        } else {
+          setError(parsed.error);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
+        setItem(null);
+        setLoading(false);
+        return;
       }
+
+      if (!parsed.data.opportunity) {
+        setNotSynced(true);
+        setError(
+          parsed.data.error ??
+            "This tender is not in Pipeline yet. Wait for the next scheduled sync.",
+        );
+        setItem(null);
+      } else {
+        setItem(parsed.data.opportunity);
+      }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [id]);
 
   function promote() {
     if (!item) return;
@@ -61,17 +78,21 @@ export function TenderDetail({ id }: { id: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/tenders/${item.id}/promote`, {
-          method: "POST",
-        });
-        const data = (await res.json()) as {
+        const parsed = await fetchJson<{
           opportunity?: Opportunity;
           error?: string;
-        };
-        if (!res.ok || !data.opportunity) {
-          throw new Error(data.error ?? "Could not add to Opportunities.");
+        }>(`/api/tenders/${item.id}/promote`, {
+          method: "POST",
+          timeoutMs: 10_000,
+        });
+        if (!parsed.ok || !parsed.data.opportunity) {
+          throw new Error(
+            !parsed.ok
+              ? parsed.error
+              : parsed.data.error ?? "Could not add to Opportunities.",
+          );
         }
-        setItem(data.opportunity);
+        setItem(parsed.data.opportunity);
       } catch (err) {
         setError(
           err instanceof Error
@@ -84,28 +105,13 @@ export function TenderDetail({ id }: { id: string }) {
     });
   }
 
-  function refreshDocuments() {
-    setRefreshingDocs(true);
-    setError(null);
-    startTransition(async () => {
-      try {
-        await load();
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Could not refresh documents.",
-        );
-      } finally {
-        setRefreshingDocs(false);
-      }
-    });
-  }
-
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-16 text-center text-sm text-muted">
-        Loading tender…
+      <div className="mx-auto max-w-3xl px-6 py-16 text-center">
+        <p className="text-sm font-semibold text-ink">Loading tender…</p>
+        <p className="mt-2 text-xs text-muted">
+          Reading from Pipeline database (not eTenders).
+        </p>
       </div>
     );
   }
@@ -116,6 +122,12 @@ export function TenderDetail({ id }: { id: string }) {
         <p className="text-sm font-semibold text-coral">
           {error ?? "Tender not found."}
         </p>
+        {notSynced ? (
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted">
+            Pipeline only shows tenders already synced by the background
+            intake job. We never call eTenders when you open a page.
+          </p>
+        ) : null}
         <Link
           href="/tenders"
           className="mt-4 inline-block text-sm font-semibold text-mint hover:underline"
@@ -237,24 +249,11 @@ export function TenderDetail({ id }: { id: string }) {
       ) : null}
 
       <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-navy/5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-ink">
-              Tender documents
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              Download the pack inside Pipeline — no need to leave for eTenders.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={refreshDocuments}
-            disabled={refreshingDocs || pending}
-            className="rounded-xl border border-navy/10 bg-white px-3 py-2 text-xs font-semibold text-navy disabled:opacity-60"
-          >
-            {refreshingDocs ? "Refreshing…" : "Refresh from eTenders"}
-          </button>
-        </div>
+        <h2 className="text-base font-semibold text-ink">Tender documents</h2>
+        <p className="mt-1 text-sm text-muted">
+          Downloads run only when you click — first fetch is cached for next
+          time.
+        </p>
         <ul className="mt-4 space-y-2">
           {item.documentLinks.map((doc, index) => (
             <li key={`${doc.url}-${index}`}>
@@ -298,25 +297,11 @@ export function TenderDetail({ id }: { id: string }) {
           ))}
           {docCount === 0 ? (
             <li className="rounded-xl border border-dashed border-navy/15 px-4 py-6 text-center text-sm text-muted">
-              No documents listed yet. Use{" "}
-              <span className="font-semibold text-ink">Refresh from eTenders</span>{" "}
-              to pull the official download links.
+              No document links were stored for this tender at sync time. They
+              will appear after a later intake run if eTenders publishes them.
             </li>
           ) : null}
         </ul>
-        {item.sourceUrl ? (
-          <p className="mt-4 text-xs text-muted">
-            Source release:{" "}
-            <a
-              href={item.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-mint hover:underline"
-            >
-              Open OCDS JSON
-            </a>
-          </p>
-        ) : null}
       </section>
 
       <div className="flex flex-wrap gap-2">

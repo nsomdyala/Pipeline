@@ -152,13 +152,32 @@ export async function listOpportunities(options?: {
   });
 }
 
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+/** Resolve by UUID id, or by OCID / externalId when the path uses that key. */
 export async function getOpportunity(id: string): Promise<Opportunity | null> {
+  const key = id.trim();
+  if (!key) return null;
+
   if (usePostgres()) {
-    const { pgGetOpportunity } = await import("@/lib/opportunities/pg-store");
-    return pgGetOpportunity(id);
+    const { pgGetOpportunity, pgFindByExternalId } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    if (looksLikeUuid(key)) {
+      const byId = await pgGetOpportunity(key);
+      if (byId) return byId;
+    }
+    return pgFindByExternalId(key);
   }
+
   const items = await ensureStore();
-  const found = items.find((item) => item.id === id);
+  const found = items.find(
+    (item) => item.id === key || item.externalId === key,
+  );
   return found ? withOpportunityDefaults(found) : null;
 }
 
