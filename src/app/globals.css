@@ -39,7 +39,6 @@
   --radius-lg: 8px;
   --radius-avatar: 6px;
 
-  --workspace-rail-width: 4.25rem;
   --sidebar-width: 15rem;
   --chat-rail-width: 22rem;
   --row-h: 2rem;
@@ -321,38 +320,3 @@ textarea:focus-visible {
   }
 }
 
-/* Mobile: workspace rail becomes bottom bar */
-@media (max-width: 900px) {
-  .workspace-shell {
-    flex-direction: column-reverse;
-  }
-
-  .workspace-rail {
-    width: 100% !important;
-    height: 3.5rem;
-    flex-direction: row !important;
-    justify-content: space-around;
-    padding: 0.35rem !important;
-    border-right: none !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .workspace-rail-scroll {
-    flex-direction: row !important;
-    overflow-x: auto;
-    gap: 0.25rem;
-  }
-
-  .area-sidebar {
-    display: none;
-  }
-
-  .area-sidebar.area-sidebar-open {
-    display: flex;
-    position: absolute;
-    inset: 0 auto 3.5rem 0;
-    z-index: 40;
-    width: min(18rem, 86vw);
-    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
-  }
-}

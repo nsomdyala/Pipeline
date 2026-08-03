@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   BriefcaseBusiness,
   Building2,
@@ -17,7 +17,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   MessagesSquare,
-  PanelLeft,
   Settings,
   Users,
 } from "lucide-react";
@@ -31,7 +30,10 @@ import {
   type NavSection,
 } from "@/lib/nav";
 
-const ICONS: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
+const ICONS: Record<
+  string,
+  React.ComponentType<{ className?: string; size?: number }>
+> = {
   "/": BriefcaseBusiness,
   "/dashboard": LayoutDashboard,
   "/tenders": ClipboardList,
@@ -70,15 +72,6 @@ export function Sidebar({
     collaborate: true,
     company: true,
   });
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  const railItems = useMemo(
-    () => navItems.filter((item) => item.rail),
-    [],
-  );
-
-  const pageTitle =
-    navItems.find((item) => isActive(pathname, item.href))?.label ?? "Pipeline";
 
   function signOut() {
     startTransition(async () => {
@@ -94,20 +87,17 @@ export function Sidebar({
 
   function onNavClick(item: NavItem) {
     if (item.href === "/chat") openLiveChat();
-    setMobileSidebarOpen(false);
   }
 
   return (
-    <div className="workspace-shell relative flex h-full shrink-0">
-      {/* Far-left workspace rail */}
-      <aside
-        className="workspace-rail flex h-full w-[var(--workspace-rail-width)] shrink-0 flex-col items-center bg-[var(--slack-aubergine-deep)] py-3 text-white"
-        aria-label="Workspace"
-      >
+    <aside
+      className="flex h-full w-[var(--sidebar-width)] shrink-0 flex-col bg-navy text-[var(--slack-sidebar-text)]"
+      aria-label="Main"
+    >
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-3 py-3">
         <Link
           href="/"
-          className="mb-3 flex size-9 items-center justify-center rounded-[var(--radius-avatar)] bg-white/10 ring-1 ring-white/15 transition hover:bg-white/15"
-          title="Pipeline"
+          className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-avatar)] bg-white/10 ring-1 ring-white/15"
           aria-label="Pipeline home"
         >
           <Image
@@ -118,140 +108,93 @@ export function Sidebar({
             priority
           />
         </Link>
+        <div className="min-w-0 flex-1">
+          <div className="wordmark truncate text-[0.95rem]">Pipeline</div>
+          <div className="mt-0.5 text-[0.65rem] text-white/45">
+            Aura Workstream
+          </div>
+        </div>
+      </div>
 
-        <div className="workspace-rail-scroll flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1">
-          {railItems.map((item) => {
-            const Icon = ICONS[item.href] ?? FolderKanban;
-            const active = isActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => onNavClick(item)}
-                title={item.label}
-                aria-label={item.label}
-                aria-current={active ? "page" : undefined}
-                className={`flex size-9 items-center justify-center rounded-[var(--radius-avatar)] transition ${
-                  active
-                    ? "bg-[var(--slack-rail-active)] text-white"
-                    : "text-[var(--slack-sidebar-text)] hover:bg-[var(--slack-aubergine-hover)] hover:text-white"
+      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Navigation">
+        {navSections.map((section) => {
+          const items = navItems.filter((item) => item.section === section.key);
+          const open = openSections[section.key];
+          const sectionActive = activeSection === section.key;
+          return (
+            <div key={section.key} className="mb-3">
+              <button
+                type="button"
+                onClick={() => toggleSection(section.key)}
+                className={`flex w-full items-center gap-1 rounded-[var(--radius-md)] px-2 py-1 text-left text-[0.7rem] font-semibold uppercase tracking-[0.06em] transition hover:bg-white/5 ${
+                  sectionActive
+                    ? "text-[var(--slack-sidebar-text-active)]"
+                    : "text-[var(--slack-sidebar-section)]"
                 }`}
+                aria-expanded={open}
               >
-                <Icon size={18} />
-              </Link>
-            );
-          })}
-        </div>
+                <ChevronDown
+                  size={14}
+                  className={`transition ${open ? "" : "-rotate-90"}`}
+                />
+                {section.title}
+              </button>
+              {open ? (
+                <ul className="mt-0.5 space-y-px">
+                  {items.map((item) => {
+                    const Icon = ICONS[item.href] ?? FolderKanban;
+                    const active = isActive(pathname, item.href);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          onClick={() => onNavClick(item)}
+                          className={`flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-[0.35rem] text-[0.875rem] transition ${
+                            active
+                              ? "bg-[var(--slack-aubergine-hover)] font-semibold text-white"
+                              : "text-[var(--slack-sidebar-text)] hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <Icon size={15} className="opacity-80" />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
+          );
+        })}
+      </nav>
 
-        <button
-          type="button"
-          className="mt-2 flex size-9 items-center justify-center rounded-[var(--radius-avatar)] text-[var(--slack-sidebar-text)] hover:bg-[var(--slack-aubergine-hover)] hover:text-white md:hidden"
-          aria-label="Toggle sidebar"
-          onClick={() => setMobileSidebarOpen((v) => !v)}
-        >
-          <PanelLeft size={18} />
-        </button>
-      </aside>
-
-      {/* Area sidebar — channel-style list */}
-      <aside
-        className={`area-sidebar flex h-full w-[var(--sidebar-width)] shrink-0 flex-col bg-navy text-[var(--slack-sidebar-text)] ${
-          mobileSidebarOpen ? "area-sidebar-open" : ""
-        }`}
-        aria-label="Channels"
-      >
-        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-3">
+      <div className="border-t border-white/10 px-3 py-3">
+        <div className="flex items-center gap-2.5">
+          <Avatar name={userName} src={avatarUrl} size={32} />
           <div className="min-w-0 flex-1">
-            <div className="wordmark truncate text-[0.95rem]">Pipeline</div>
-            <div className="mt-0.5 text-[0.65rem] text-white/45">
-              Aura Workstream
+            <div className="truncate text-sm font-semibold text-white">
+              {userName}
             </div>
+            <div className="truncate text-[0.65rem] text-mint">{role}</div>
           </div>
         </div>
-
-        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Main">
-          {navSections.map((section) => {
-            const items = navItems.filter((item) => item.section === section.key);
-            const open = openSections[section.key];
-            const sectionActive = activeSection === section.key;
-            return (
-              <div key={section.key} className="mb-3">
-                <button
-                  type="button"
-                  onClick={() => toggleSection(section.key)}
-                  className={`flex w-full items-center gap-1 rounded-[var(--radius-md)] px-2 py-1 text-left text-[0.7rem] font-semibold uppercase tracking-[0.06em] transition hover:bg-white/5 ${
-                    sectionActive
-                      ? "text-[var(--slack-sidebar-text-active)]"
-                      : "text-[var(--slack-sidebar-section)]"
-                  }`}
-                  aria-expanded={open}
-                >
-                  <ChevronDown
-                    size={14}
-                    className={`transition ${open ? "" : "-rotate-90"}`}
-                  />
-                  {section.title}
-                </button>
-                {open ? (
-                  <ul className="mt-0.5 space-y-px">
-                    {items.map((item) => {
-                      const Icon = ICONS[item.href] ?? FolderKanban;
-                      const active = isActive(pathname, item.href);
-                      return (
-                        <li key={item.href}>
-                          <Link
-                            href={item.href}
-                            onClick={() => onNavClick(item)}
-                            className={`flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-[0.35rem] text-[0.875rem] transition ${
-                              active
-                                ? "bg-[var(--slack-aubergine-hover)] font-semibold text-white"
-                                : "text-[var(--slack-sidebar-text)] hover:bg-white/5 hover:text-white"
-                            }`}
-                          >
-                            <Icon size={15} className="opacity-80" />
-                            <span className="truncate">{item.label}</span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-white/10 px-3 py-3">
-          <div className="flex items-center gap-2.5">
-            <Avatar name={userName} src={avatarUrl} size={32} />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-white">
-                {userName}
-              </div>
-              <div className="truncate text-[0.65rem] text-mint">{role}</div>
-            </div>
-          </div>
-          <div className="mt-2 flex gap-1">
-            <Link
-              href="/settings"
-              className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white"
-            >
-              Profile
-            </Link>
-            <button
-              type="button"
-              onClick={signOut}
-              disabled={pending}
-              className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white disabled:opacity-50"
-            >
-              {pending ? "…" : "Sign out"}
-            </button>
-          </div>
+        <div className="mt-2 flex gap-1">
+          <Link
+            href="/settings"
+            className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white"
+          >
+            Profile
+          </Link>
+          <button
+            type="button"
+            onClick={signOut}
+            disabled={pending}
+            className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white disabled:opacity-50"
+          >
+            {pending ? "…" : "Sign out"}
+          </button>
         </div>
-      </aside>
-
-      {/* Screen-reader / mobile page context (title lives in main top bar via AppShell) */}
-      <span className="sr-only">{pageTitle}</span>
-    </div>
+      </div>
+    </aside>
   );
 }

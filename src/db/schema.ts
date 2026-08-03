@@ -179,6 +179,15 @@ export const opportunities = pgTable(
     index("opportunities_buyer_name_idx").on(t.buyerName),
     index("opportunities_province_idx").on(t.province),
     index("opportunities_type_idx").on(t.opportunityType),
+    index("opportunities_is_panel_idx").on(t.isPanel),
+    index("opportunities_stage_idx").on(t.stage),
+    index("opportunities_owner_name_idx").on(t.ownerName),
+    index("opportunities_created_at_idx").on(t.createdAt),
+    index("opportunities_pipeline_category_closing_idx").on(
+      t.inPipeline,
+      t.category,
+      t.closingAt,
+    ),
   ],
 );
 

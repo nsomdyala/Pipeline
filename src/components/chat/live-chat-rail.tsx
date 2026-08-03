@@ -168,10 +168,15 @@ export function LiveChatRail({
   }, [authorName, authorAvatarUrl]);
 
   useEffect(() => {
-    const names = [...new Set(messages.map((m) => m.authorName).filter(Boolean))];
-    if (names.length === 0) return;
+    const names = [
+      ...new Set(messages.map((m) => m.authorName).filter(Boolean)),
+    ];
+    const missing = names.filter((n) => !(n in avatarByName));
+    if (missing.length === 0) return;
     let cancelled = false;
-    void fetch(`/api/avatars/lookup?names=${encodeURIComponent(names.join("|"))}`)
+    void fetch(
+      `/api/avatars/lookup?names=${encodeURIComponent(missing.join("|"))}`,
+    )
       .then((r) => r.json())
       .then((d: { avatars?: Record<string, string | null> }) => {
         if (cancelled || !d.avatars) return;
@@ -183,6 +188,7 @@ export function LiveChatRail({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-check when messages change
   }, [messages]);
 
   useEffect(() => {
@@ -203,7 +209,7 @@ export function LiveChatRail({
 
     const timer = window.setInterval(() => {
       void loadMessages(activeId, true).catch(() => undefined);
-    }, 2500);
+    }, 10_000);
 
     return () => {
       cancelled = true;

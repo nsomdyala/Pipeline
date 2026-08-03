@@ -1,17 +1,13 @@
-import { LiveChatRail } from "@/components/chat/live-chat-rail";
+import { LiveChatRailLazy } from "@/components/chat/live-chat-rail-lazy";
 import { Sidebar } from "@/components/sidebar";
 import { MainTopBar } from "@/components/main-top-bar";
 import { getSession, roleLabel } from "@/lib/auth/session";
-import { findUserById } from "@/lib/auth/users";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   const userName = session?.name ?? "Guest";
-  let avatarUrl = session?.avatarUrl ?? null;
-  if (session?.id && !avatarUrl) {
-    const fresh = await findUserById(session.id).catch(() => null);
-    avatarUrl = fresh?.avatarUrl ?? null;
-  }
+  // Prefer session cookie — avoid an extra DB round-trip on every page.
+  const avatarUrl = session?.avatarUrl ?? null;
 
   return (
     <div className="flex h-dvh overflow-hidden bg-mist">
@@ -27,7 +23,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
-        <LiveChatRail
+        <LiveChatRailLazy
           authorName={userName}
           authorAvatarUrl={avatarUrl}
         />
