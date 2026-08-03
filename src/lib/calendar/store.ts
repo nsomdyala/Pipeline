@@ -1,3 +1,5 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 import { readJsonFile, writeJsonFile } from "@/lib/json-store";
 import type {

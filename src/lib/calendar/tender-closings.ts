@@ -1,22 +1,14 @@
+import "server-only";
+
+import {
+  AUTO_CLOSING_PREFIX,
+  isAutoClosingEvent,
+} from "@/lib/calendar/auto-closing";
 import { defaultEtendersCategories } from "@/lib/intake/config/etenders-categories";
 import type { CalendarEvent } from "@/lib/calendar/types";
 import { deriveTenderStatus } from "@/lib/opportunities/search";
 import { listOpportunities } from "@/lib/opportunities/store";
 import type { Opportunity } from "@/lib/opportunities/types";
-
-export const AUTO_CLOSING_PREFIX = "auto-closing-";
-
-export function isAutoClosingEvent(event: Pick<CalendarEvent, "id" | "createdBy">) {
-  return (
-    event.id.startsWith(AUTO_CLOSING_PREFIX) ||
-    event.createdBy === "Pipeline · intake"
-  );
-}
-
-export function opportunityIdFromAutoClosing(eventId: string): string | null {
-  if (!eventId.startsWith(AUTO_CLOSING_PREFIX)) return null;
-  return eventId.slice(AUTO_CLOSING_PREFIX.length) || null;
-}
 
 async function resolveDefaultCategories(): Promise<Set<string>> {
   try {

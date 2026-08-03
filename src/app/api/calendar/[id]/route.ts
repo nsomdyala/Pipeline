@@ -7,8 +7,8 @@ import {
 import {
   AUTO_CLOSING_PREFIX,
   isAutoClosingEvent,
-  tenderClosingEvents,
-} from "@/lib/calendar/tender-closings";
+} from "@/lib/calendar/auto-closing";
+import { tenderClosingEvents } from "@/lib/calendar/tender-closings";
 import { EVENT_KINDS, type EventKind } from "@/lib/calendar/types";
 
 type Params = { params: Promise<{ id: string }> };

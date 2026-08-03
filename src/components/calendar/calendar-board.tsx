@@ -11,7 +11,7 @@ import {
 import {
   isAutoClosingEvent,
   opportunityIdFromAutoClosing,
-} from "@/lib/calendar/tender-closings";
+} from "@/lib/calendar/auto-closing";
 
 const kindLabel: Record<EventKind, string> = {
   meeting: "Meeting",

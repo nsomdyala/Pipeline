@@ -1,3 +1,5 @@
+import "server-only";
+
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { opportunities as opportunitiesTable } from "@/db/schema";
