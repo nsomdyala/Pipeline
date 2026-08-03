@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
-  formatZaDate,
+  displayTenderRef,
+  formatZaClosing,
   workingDaysUntil,
 } from "@/lib/opportunities/dates";
 import { fetchJson } from "@/lib/http/fetch-json";
@@ -18,7 +19,7 @@ type Scope = "defaults" | "beyond_defaults";
 
 type Filters = {
   q: string;
-  type: "all" | "rfq" | "tender" | "panel";
+  type: "all" | "rfq" | "rfp" | "tender" | "panel";
   buyer: string;
   includeClosed: boolean;
   scope: Scope;
@@ -138,14 +139,16 @@ export function AllTendersBoard() {
           method: "POST",
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Could not add to Opportunities.");
+        if (!res.ok) {
+          throw new Error(data.error ?? "Could not move to Opportunities.");
+        }
+        // Remove from All Tenders — it now lives on the Opportunities board.
         setResult((prev) =>
           prev
             ? {
                 ...prev,
-                items: prev.items.map((row) =>
-                  row.id === item.id ? data.opportunity : row,
-                ),
+                items: prev.items.filter((row) => row.id !== item.id),
+                total: Math.max(0, prev.total - 1),
               }
             : prev,
         );
@@ -180,10 +183,10 @@ export function AllTendersBoard() {
             All Tenders
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">
-            Defaults load automatically from our eTenders categories. Use{" "}
-            <span className="font-semibold text-ink">Search outside defaults</span>{" "}
-            for RFQs, tenders and RFPs in other categories. Click any row to open
-            the tender, view details, and download documents.
+            Browse RFQs, tenders and RFPs from eTenders. Use{" "}
+            <span className="font-semibold text-ink">Move to Opportunities</span>{" "}
+            to pull one onto the team board — it leaves this list when moved.
+            Click a row to view details and download documents.
           </p>
         </div>
         <Link
@@ -217,7 +220,8 @@ export function AllTendersBoard() {
             [
               ["all", "All types"],
               ["rfq", "RFQs"],
-              ["tender", "Tenders / RFPs"],
+              ["rfp", "RFPs"],
+              ["tender", "Tenders"],
               ["panel", "Panels"],
             ] as const
           ).map(([value, label]) => (
@@ -324,9 +328,6 @@ export function AllTendersBoard() {
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted">
                     <div className="font-semibold text-ink">Loading tenders…</div>
-                    <div className="mt-1 text-xs">
-                      Querying Pipeline database only
-                    </div>
                   </td>
                 </tr>
               ) : null}
@@ -347,7 +348,9 @@ export function AllTendersBoard() {
                   ? "Panel"
                   : item.opportunityType === "rfq"
                     ? "RFQ"
-                    : "Tender / RFP";
+                    : item.opportunityType === "rfp"
+                      ? "RFP"
+                      : "Tender";
                 return (
                   <tr
                     key={item.id}
@@ -364,7 +367,7 @@ export function AllTendersBoard() {
                   >
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs font-semibold text-mint">
-                        {item.refNo}
+                        {displayTenderRef(item)}
                       </span>
                       <div className="mt-1 text-[0.65rem] font-semibold text-navy/70">
                         Open →
@@ -393,7 +396,7 @@ export function AllTendersBoard() {
                           atRisk ? "text-coral" : "text-ink"
                         }`}
                       >
-                        {formatZaDate(item.closingAt)}
+                        {formatZaClosing(item.closingAt)}
                       </div>
                       <div
                         className={`mt-0.5 text-xs ${
@@ -413,47 +416,18 @@ export function AllTendersBoard() {
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
-                      {item.convertedToLeadId ? (
-                        <Link
-                          href="/leads"
-                          className="text-xs font-semibold text-mint hover:underline"
-                        >
-                          In Leads
-                        </Link>
-                      ) : item.convertedToAccountId ? (
-                        <Link
-                          href="/accounts"
-                          className="text-xs font-semibold text-mint hover:underline"
-                        >
-                          In Accounts
-                        </Link>
-                      ) : item.inPipeline ? (
-                        <Link
-                          href="/opportunities"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-mint/20 text-navy ring-1 ring-mint/40"
-                          title="On Opportunities"
-                          aria-label="On Opportunities"
-                        >
-                          <TickIcon />
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={promotingId === item.id || pending}
-                          onClick={(e) => promote(item, e)}
-                          title="Add to Opportunities"
-                          aria-label="Add to Opportunities"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white transition hover:bg-navy/90 disabled:opacity-50"
-                        >
-                          {promotingId === item.id ? (
-                            <span className="text-[0.65rem] font-semibold">
-                              …
-                            </span>
-                          ) : (
-                            <TickIcon />
-                          )}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        disabled={promotingId === item.id || pending}
+                        onClick={(e) => promote(item, e)}
+                        title="Move to Opportunities"
+                        aria-label="Move to Opportunities"
+                        className="rounded-xl bg-navy px-3 py-2 text-xs font-semibold text-white transition hover:bg-navy/90 disabled:opacity-50"
+                      >
+                        {promotingId === item.id
+                          ? "Moving…"
+                          : "To Opportunities"}
+                      </button>
                     </td>
                   </tr>
                 );
@@ -487,22 +461,5 @@ export function AllTendersBoard() {
         ) : null}
       </div>
     </div>
-  );
-}
-
-function TickIcon() {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className="h-4 w-4"
-      aria-hidden
-    >
-      <path
-        fillRule="evenodd"
-        d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-        clipRule="evenodd"
-      />
-    </svg>
   );
 }

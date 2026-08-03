@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  displayTenderRef,
+  formatZaClosing,
   formatZaDate,
   formatZar,
   workingDaysUntil,
@@ -67,13 +68,12 @@ export function OpportunitiesBoard() {
   const [files, setFiles] = useState<FileList | null>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [intakeStatus, setIntakeStatus] = useState<string | null>(null);
-  const [runningIntake, setRunningIntake] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,43 +117,6 @@ export function OpportunitiesBoard() {
     () => items.filter((item) => item.isPanel).length,
     [items],
   );
-
-  function runEtenders() {
-    setRunningIntake(true);
-    setError(null);
-    setIntakeStatus(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch("/api/intake/etenders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error ?? "Intake run failed.");
-        }
-        const r = data.result as {
-          fetched: number;
-          created: number;
-          amended: number;
-          status: string;
-          errors: string[];
-        };
-        setIntakeStatus(
-          `eTenders ${r.status}: fetched ${r.fetched}, created ${r.created}, amended ${r.amended}` +
-            (r.errors?.length ? ` · ${r.errors[0]}` : ""),
-        );
-        const refresh = await fetch("/api/opportunities?scope=pipeline");
-        const body = (await refresh.json()) as { opportunities: Opportunity[] };
-        setItems(body.opportunities);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Intake run failed.");
-      } finally {
-        setRunningIntake(false);
-      }
-    });
-  }
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -264,7 +227,7 @@ export function OpportunitiesBoard() {
           throw new Error(data.error ?? "Could not move to Leads.");
         }
         setItems((prev) => prev.filter((item) => item.id !== opportunityId));
-        setIntakeStatus(
+        setStatusMessage(
           `${kind === "quotation" ? "Quotation" : "Pricing"} uploaded — moved to Leads.`,
         );
       } catch (err) {
@@ -287,25 +250,12 @@ export function OpportunitiesBoard() {
             Opportunities
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Tick tenders from All Tenders into this board. When you submit,
-            upload the quotation or pricing to move it into Leads.
+            Add opportunities manually, or move RFQs / tenders / RFPs here from
+            All Tenders. When you submit, upload the quotation or pricing to
+            move into Leads.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/tenders"
-            className="inline-flex items-center justify-center rounded-xl border border-navy/10 bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-mist"
-          >
-            All Tenders
-          </Link>
-          <button
-            type="button"
-            onClick={runEtenders}
-            disabled={runningIntake || pending}
-            className="inline-flex items-center justify-center rounded-xl border border-navy/10 bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-mist disabled:opacity-60"
-          >
-            {runningIntake ? "Running eTenders…" : "Run eTenders now"}
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -319,8 +269,8 @@ export function OpportunitiesBoard() {
         </div>
       </header>
 
-      {intakeStatus ? (
-        <p className="mb-4 text-xs font-semibold text-mint">{intakeStatus}</p>
+      {statusMessage ? (
+        <p className="mb-4 text-xs font-semibold text-mint">{statusMessage}</p>
       ) : null}
 
       {open ? (
@@ -559,6 +509,7 @@ export function OpportunitiesBoard() {
                 ["all", "All"],
                 ["panel", "Panels"],
                 ["rfq", "RFQs"],
+                ["rfp", "RFPs"],
                 ["tender", "Tenders"],
               ] as const
             ).map(([value, label]) => (
@@ -594,8 +545,9 @@ export function OpportunitiesBoard() {
           <div className="rounded-2xl border border-dashed border-navy/15 bg-white px-6 py-16 text-center">
             <p className="text-sm font-semibold text-ink">No opportunities yet</p>
             <p className="mt-2 text-sm text-muted">
-              Run eTenders intake or{" "}
-              <span className="font-semibold text-ink">Add opportunity</span>.
+              Use{" "}
+              <span className="font-semibold text-ink">Add opportunity</span>,
+              or move an RFQ / tender / RFP from All Tenders.
             </p>
           </div>
         ) : (
@@ -614,7 +566,7 @@ export function OpportunitiesBoard() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs text-muted">
-                          {item.refNo}
+                          {displayTenderRef(item)}
                         </span>
                         {item.isPanel ? (
                           <span className="rounded-md bg-mint px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-navy">
@@ -622,7 +574,11 @@ export function OpportunitiesBoard() {
                           </span>
                         ) : (
                           <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
-                            {item.opportunityType}
+                            {item.opportunityType === "rfq"
+                              ? "RFQ"
+                              : item.opportunityType === "rfp"
+                                ? "RFP"
+                                : "Tender"}
                           </span>
                         )}
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-muted">
@@ -753,7 +709,7 @@ export function OpportunitiesBoard() {
                           atRisk ? "text-coral" : "text-ink"
                         }`}
                       >
-                        {formatZaDate(item.closingAt)}
+                        {formatZaClosing(item.closingAt)}
                       </div>
                       <div
                         className={`mt-0.5 text-xs font-semibold ${

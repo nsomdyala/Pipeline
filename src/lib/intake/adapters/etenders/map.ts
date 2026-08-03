@@ -9,15 +9,20 @@ function str(value: unknown): string | null {
   return t ? t : null;
 }
 
-function detectProcurementHint(
-  tender: OcdsRelease["tender"],
-  title: string,
-  description: string,
-): "tender" | "rfq" | null {
-  const blob = `${title} ${description} ${tender?.procurementMethodDetails ?? ""} ${tender?.procurementMethod ?? ""}`.toLowerCase();
-  if (/\brfq\b|request for quotation/.test(blob)) return "rfq";
-  if (/\brfp\b|tender|bid\b/.test(blob)) return "tender";
-  return null;
+/**
+ * Parse an OCDS datetime into a UTC ISO instant.
+ * eTenders sends full ISO values (usually with Z). We never substitute
+ * publication date / enquiryPeriod for closing.
+ */
+export function parseOcdsInstant(value: string | null | undefined): string | null {
+  const raw = str(value);
+  if (!raw) return null;
+  // Ignore eTenders sentinel empties.
+  if (raw.startsWith("0001-01-01")) return null;
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
 }
 
 export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
@@ -59,11 +64,12 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
       format: str(d.format) ?? undefined,
     }));
 
+  const briefingDate = parseOcdsInstant(tender.briefingSession?.date);
   const briefing = tender.briefingSession
     ? {
         isSession: Boolean(tender.briefingSession.isSession),
         compulsory: Boolean(tender.briefingSession.compulsory),
-        date: str(tender.briefingSession.date),
+        date: briefingDate,
         venue: str(tender.briefingSession.venue),
       }
     : null;
@@ -83,6 +89,12 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
       ? `${tender.contractPeriod.startDate} → ${tender.contractPeriod.endDate}`
       : null);
 
+  // Closing MUST come from tenderPeriod.endDate only.
+  const closingAt = parseOcdsInstant(tender.tenderPeriod?.endDate);
+  const procurementMethod = str(tender.procurementMethod);
+  const procurementMethodDetails = str(tender.procurementMethodDetails);
+  const tenderId = str(tender.id);
+
   const matchText = [title, description, category ?? ""].join("\n");
   const contentHash = createHash("sha256")
     .update(
@@ -92,30 +104,39 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
         description,
         buyer,
         category,
-        closingAt: tender.tenderPeriod?.endDate ?? null,
+        closingAt,
         amount: estimatedValue,
         province: tender.province ?? null,
         hasFrameworkAgreement: tender.techniques?.hasFrameworkAgreement ?? null,
+        procurementMethod,
+        procurementMethodDetails,
         docs: documents.map((d) => d.url),
       }),
     )
     .digest("hex")
     .slice(0, 32);
 
-  const tenderRef = str(tender.id);
+  // eTenders often puts a numeric internal id in tender.id; the buyer
+  // reference usually lives in title (e.g. TNPA/…/RFP, MMSEZ/INF/…).
+  const titleLooksLikeRef =
+    title.length <= 64 && !/\s{2,}/.test(title) && title !== "Untitled tender";
+  const humanRef =
+    (tenderId && !/^\d+$/.test(tenderId) ? tenderId : null) ??
+    (titleLooksLikeRef ? title : null) ??
+    ocid;
 
   return {
     externalId: ocid,
     // Prefer the human tender / RFQ number; keep OCID as externalId for dedupe.
-    refNo: tenderRef ?? ocid,
+    refNo: humanRef,
     sourceKey: "etenders",
     sourceLabel: "eTenders",
     sector: "public",
     buyer,
     title,
     description,
-    closingAt: str(tender.tenderPeriod?.endDate),
-    publishedAt: str(raw.date),
+    closingAt,
+    publishedAt: parseOcdsInstant(raw.date),
     province: str(tender.province),
     category,
     ocdsMainCategory: ocdsMain,
@@ -133,6 +154,8 @@ export function mapOcdsRelease(raw: OcdsRelease): NormalisedOpportunity {
         : null,
     panelTerm,
     matchText,
-    procurementHint: detectProcurementHint(tender, title, description),
+    tenderId,
+    procurementMethod,
+    procurementMethodDetails,
   };
 }

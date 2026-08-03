@@ -94,7 +94,10 @@ export async function GET(request: Request) {
             ? (laneRaw as OppLane)
             : "all",
       opportunityType:
-        typeRaw === "tender" || typeRaw === "rfq" || typeRaw === "panel"
+        typeRaw === "tender" ||
+        typeRaw === "rfq" ||
+        typeRaw === "rfp" ||
+        typeRaw === "panel"
           ? typeRaw
           : "all",
       isPanel: parseBool(searchParams.get("isPanel")),

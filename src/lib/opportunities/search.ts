@@ -25,7 +25,7 @@ export type TenderSearchQuery = {
   closingTo?: string;
   status?: TenderStatusFilter | "all";
   lane?: OppLane | "Other / unmatched" | "all";
-  opportunityType?: "tender" | "rfq" | "panel" | "all";
+  opportunityType?: "tender" | "rfq" | "rfp" | "panel" | "all";
   isPanel?: boolean | null;
   /** Default true: only closingAt in the future (and not awarded/closed stage). */
   openOnly?: boolean;
@@ -94,7 +94,11 @@ export function searchTenders(
   const includeClosed = query.includeClosed ?? false;
   const openOnly = query.openOnly ?? !includeClosed;
 
-  let rows = all.filter((item) => item.source === "eTenders" || item.externalId);
+  // All Tenders = eTenders releases not yet moved to the Opportunities board.
+  let rows = all.filter(
+    (item) =>
+      (item.source === "eTenders" || item.externalId) && !item.inPipeline,
+  );
 
   if (query.q?.trim()) {
     rows = rows.filter((item) => matchesQuery(item, query.q!.trim()));

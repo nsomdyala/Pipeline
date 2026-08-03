@@ -87,6 +87,22 @@ export async function updateUserRoleInDb(id: string, role: UserRole) {
   return toSession(row);
 }
 
+export async function setUserPasswordInDb(id: string, password: string) {
+  if (!password || password.length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+  const [row] = await db
+    .update(users)
+    .set({
+      passwordHash: hashPassword(password),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, id))
+    .returning();
+  if (!row) throw new Error("User not found.");
+  return toSession(row);
+}
+
 export async function removeUserFromDb(id: string) {
   const user = await db.select().from(users).where(eq(users.id, id)).limit(1);
   if (!user[0]) throw new Error("User not found.");

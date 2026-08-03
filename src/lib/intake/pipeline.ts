@@ -192,7 +192,28 @@ export async function runIntake(
       }
 
       if (existing.contentHash === normalised.contentHash) {
-        result.unchanged += 1;
+        // Still refresh type / closing when classifier or SAST display source improves.
+        const closingChanged =
+          Boolean(normalised.closingAt) &&
+          normalised.closingAt !== existing.closingAt;
+        const typeChanged =
+          existing.opportunityType !== panel.opportunityType ||
+          existing.isPanel !== panel.isPanel;
+        if (closingChanged || typeChanged) {
+          const { updateOpportunity } = await import(
+            "@/lib/opportunities/store"
+          );
+          await updateOpportunity(existing.id, {
+            closingAt: normalised.closingAt ?? existing.closingAt,
+            opportunityType: panel.opportunityType,
+            isPanel: panel.isPanel,
+            panelMaxParticipants: panel.panelMaxParticipants,
+            panelTerm: panel.panelTerm,
+          });
+          result.amended += 1;
+        } else {
+          result.unchanged += 1;
+        }
         continue;
       }
 

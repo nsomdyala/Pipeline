@@ -1,4 +1,4 @@
-import { countTermHits, PANEL_KEYWORDS } from "@/lib/intake/match/keywords";
+import { classifyOpportunityType } from "@/lib/intake/match/classify";
 import type { NormalisedOpportunity } from "@/lib/intake/types";
 import type { OpportunityType } from "@/lib/opportunities/types";
 
@@ -7,23 +7,26 @@ export type PanelMatchResult = {
   opportunityType: OpportunityType;
   panelMaxParticipants: number | null;
   panelTerm: string | null;
-  via: "structured" | "keyword" | null;
+  via: "framework" | "panel_text" | "method_details" | "title_id" | "default";
 };
 
 export function matchPanel(item: NormalisedOpportunity): PanelMatchResult {
-  const structured = item.hasFrameworkAgreement === true;
-  const keywordHit = countTermHits(item.matchText, PANEL_KEYWORDS) > 0;
-  const isPanel = structured || keywordHit;
-
-  let opportunityType: OpportunityType = "tender";
-  if (isPanel) opportunityType = "panel";
-  else if (item.procurementHint === "rfq") opportunityType = "rfq";
+  const classified = classifyOpportunityType({
+    title: item.title,
+    description: item.description,
+    tenderId: item.tenderId,
+    procurementMethod: item.procurementMethod,
+    procurementMethodDetails: item.procurementMethodDetails,
+    hasFrameworkAgreement: item.hasFrameworkAgreement,
+  });
 
   return {
-    isPanel,
-    opportunityType,
-    panelMaxParticipants: isPanel ? item.panelMaxParticipants : null,
-    panelTerm: isPanel ? item.panelTerm : null,
-    via: structured ? "structured" : keywordHit ? "keyword" : null,
+    isPanel: classified.isPanel,
+    opportunityType: classified.opportunityType,
+    panelMaxParticipants: classified.isPanel
+      ? item.panelMaxParticipants
+      : null,
+    panelTerm: classified.isPanel ? item.panelTerm : null,
+    via: classified.via,
   };
 }

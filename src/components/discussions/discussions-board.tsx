@@ -17,13 +17,15 @@ export function DiscussionsBoard() {
   const [linkedTo, setLinkedTo] = useState("");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     void fetch("/api/discussions")
       .then((r) => r.json())
-      .then((d: { topics: DiscussionTopic[] }) => setTopics(d.topics))
-      .catch(() => setError("Could not load discussions."));
+      .then((d: { topics: DiscussionTopic[] }) => setTopics(d.topics ?? []))
+      .catch(() => setError("Could not load discussions."))
+      .finally(() => setLoading(false));
   }, []);
 
   function createTopic(e: React.FormEvent) {
@@ -74,11 +76,11 @@ export function DiscussionsBoard() {
         <div>
           <p className="label-mono mb-2">Collaborate</p>
           <h1 className="text-2xl font-semibold tracking-[-0.03em] text-ink">
-            Discussions
+            Discussion forum
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted">
-            Long-form topics linked to opportunities and accounts — decisions
-            that should not vanish up a chat scroll.
+            Team forum for strategy, lessons, and product decisions — keep
+            threads here so they don’t disappear in chat.
           </p>
         </div>
         <button
@@ -86,7 +88,7 @@ export function DiscussionsBoard() {
           onClick={() => setOpen((v) => !v)}
           className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
         >
-          {open ? "Cancel" : "New topic"}
+          {open ? "Cancel" : "Start discussion"}
         </button>
       </header>
 
@@ -149,6 +151,19 @@ export function DiscussionsBoard() {
 
       {error ? <p className="mb-3 text-sm font-semibold text-coral">{error}</p> : null}
 
+      {loading ? (
+        <p className="text-sm text-muted">Loading forum…</p>
+      ) : null}
+
+      {!loading && topics.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-navy/15 bg-white px-6 py-10 text-center">
+          <p className="text-sm font-semibold text-ink">No discussions yet</p>
+          <p className="mt-2 text-sm text-muted">
+            Start a topic so the team can capture decisions and lessons.
+          </p>
+        </div>
+      ) : null}
+
       <ul className="space-y-4">
         {topics.map((topic) => (
           <li
@@ -172,7 +187,9 @@ export function DiscussionsBoard() {
             </div>
             <h2 className="mt-2 text-lg font-semibold text-ink">{topic.title}</h2>
             <p className="mt-1 text-sm text-muted">
-              {topic.linkedTo || "No link"} · {formatZaDate(topic.updatedAt)}
+              {topic.authorName}
+              {topic.linkedTo ? ` · ${topic.linkedTo}` : ""} ·{" "}
+              {formatZaDate(topic.updatedAt)}
             </p>
             <p className="mt-3 text-sm text-ink/85">{topic.body}</p>
             {topic.posts.length > 0 ? (

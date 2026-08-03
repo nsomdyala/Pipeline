@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { fetchJson } from "@/lib/http/fetch-json";
 import {
+  displayTenderRef,
+  formatZaClosing,
   formatZaDate,
   formatZar,
   workingDaysUntil,
@@ -89,7 +91,7 @@ export function TenderDetail({ id }: { id: string }) {
           throw new Error(
             !parsed.ok
               ? parsed.error
-              : parsed.data.error ?? "Could not add to Opportunities.",
+              : parsed.data.error ?? "Could not move to Opportunities.",
           );
         }
         setItem(parsed.data.opportunity);
@@ -97,7 +99,7 @@ export function TenderDetail({ id }: { id: string }) {
         setError(
           err instanceof Error
             ? err.message
-            : "Could not add to Opportunities.",
+            : "Could not move to Opportunities.",
         );
       } finally {
         setPromoting(false);
@@ -109,9 +111,6 @@ export function TenderDetail({ id }: { id: string }) {
     return (
       <div className="mx-auto max-w-3xl px-6 py-16 text-center">
         <p className="text-sm font-semibold text-ink">Loading tender…</p>
-        <p className="mt-2 text-xs text-muted">
-          Reading from Pipeline database (not eTenders).
-        </p>
       </div>
     );
   }
@@ -143,7 +142,9 @@ export function TenderDetail({ id }: { id: string }) {
     ? "Panel"
     : item.opportunityType === "rfq"
       ? "RFQ"
-      : "Tender / RFP";
+      : item.opportunityType === "rfp"
+        ? "RFP"
+        : "Tender";
   const docCount = item.documentLinks.length + item.files.length;
 
   return (
@@ -162,13 +163,8 @@ export function TenderDetail({ id }: { id: string }) {
             {typeLabel}
           </span>
           <span className="font-mono text-xs font-semibold text-ink">
-            {item.refNo}
+            {displayTenderRef(item)}
           </span>
-          {item.externalId && item.externalId !== item.refNo ? (
-            <span className="font-mono text-[0.65rem] text-muted">
-              {item.externalId}
-            </span>
-          ) : null}
           {item.category ? (
             <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
               {item.category}
@@ -197,7 +193,7 @@ export function TenderDetail({ id }: { id: string }) {
         <div>
           <div className="label-mono">Closing</div>
           <div className="mt-1 font-mono text-sm font-semibold text-ink">
-            {formatZaDate(item.closingAt)}
+            {formatZaClosing(item.closingAt)}
           </div>
           <div className="text-xs text-muted">
             {days} working {days === 1 ? "day" : "days"} left
@@ -324,16 +320,16 @@ export function TenderDetail({ id }: { id: string }) {
             href="/opportunities"
             className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
           >
-            On Opportunities
+            View on Opportunities
           </Link>
         ) : (
           <button
             type="button"
             onClick={promote}
             disabled={promoting || pending}
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+            className="rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {promoting ? "Adding…" : "Add to Opportunities"}
+            {promoting ? "Moving…" : "Move to Opportunities"}
           </button>
         )}
         <Link

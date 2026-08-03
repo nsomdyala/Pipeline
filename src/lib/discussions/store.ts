@@ -1,12 +1,17 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 import { readJsonFile, writeJsonFile } from "@/lib/json-store";
 import type { DiscussionTopic, TopicCategory } from "@/lib/discussions/types";
 
 const FILE = "discussions.json";
 
+function usePostgres() {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
 function seed(): DiscussionTopic[] {
   const now = new Date();
-  const iso = now.toISOString();
   const ago = (h: number) => new Date(now.getTime() - h * 3600_000).toISOString();
   return [
     {
@@ -74,6 +79,10 @@ async function ensure(): Promise<DiscussionTopic[]> {
 }
 
 export async function listTopics() {
+  if (usePostgres()) {
+    const { pgListTopics } = await import("@/lib/discussions/pg-store");
+    return pgListTopics();
+  }
   const topics = await ensure();
   return topics.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -86,7 +95,12 @@ export async function createTopic(input: {
   category: TopicCategory;
   body: string;
   linkedTo?: string;
+  authorName?: string;
 }) {
+  if (usePostgres()) {
+    const { pgCreateTopic } = await import("@/lib/discussions/pg-store");
+    return pgCreateTopic(input);
+  }
   const now = new Date().toISOString();
   const topic: DiscussionTopic = {
     id: randomUUID(),
@@ -96,7 +110,7 @@ export async function createTopic(input: {
     linkedTo: input.linkedTo?.trim() ?? "",
     pinned: false,
     solved: false,
-    authorName: "Ndumiso Somdyala",
+    authorName: input.authorName?.trim() || "Pipeline",
     posts: [],
     createdAt: now,
     updatedAt: now,
@@ -107,14 +121,22 @@ export async function createTopic(input: {
   return topic;
 }
 
-export async function addReply(topicId: string, body: string) {
+export async function addReply(
+  topicId: string,
+  body: string,
+  authorName?: string,
+) {
+  if (usePostgres()) {
+    const { pgAddReply } = await import("@/lib/discussions/pg-store");
+    return pgAddReply(topicId, body, authorName);
+  }
   const topics = await ensure();
   const index = topics.findIndex((t) => t.id === topicId);
   if (index < 0) return null;
   const now = new Date().toISOString();
   topics[index].posts.push({
     id: randomUUID(),
-    authorName: "Ndumiso Somdyala",
+    authorName: authorName?.trim() || "Pipeline",
     body: body.trim(),
     createdAt: now,
   });

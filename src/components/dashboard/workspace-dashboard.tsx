@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  displayTenderRef,
+  formatZaClosing,
   formatZaDate,
   formatZar,
   workingDaysUntil,
@@ -266,7 +268,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs text-muted">
-                          {card.refNo}
+                          {displayTenderRef(card)}
                         </span>
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-muted">
                           {card.sector}
@@ -274,7 +276,9 @@ export function WorkspaceDashboard({ userName, role }: Props) {
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
                           {card.source}
                         </span>
-                        {view === "team" ? (
+                        {view === "team" &&
+                        card.ownerName &&
+                        card.ownerName !== "Intake" ? (
                           <span className="rounded-md bg-navy/5 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
                             {card.ownerName}
                           </span>
@@ -294,7 +298,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
                           atRiskItem ? "text-coral" : "text-ink"
                         }`}
                       >
-                        {formatZaDate(card.closingAt)}
+                        {formatZaClosing(card.closingAt)}
                       </div>
                       <div
                         className={`mt-0.5 text-xs font-semibold ${

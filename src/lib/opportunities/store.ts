@@ -282,8 +282,9 @@ export async function createOpportunityFromIntake(
   fields: IntakeUpsertFields,
 ): Promise<Opportunity> {
   const { normalised: n } = fields;
-  // Lane is a TAG — every release is stored. Board only shows inPipeline.
-  const inPipeline = !fields.lowRelevance && fields.lane !== "Other";
+  // Intake stores every release for All Tenders. Opportunities only after
+  // an explicit "Move to Opportunities" action (or manual add).
+  const inPipeline = false;
   return createOpportunity({
     refNo: n.refNo,
     title: n.title,
@@ -331,7 +332,6 @@ export async function updateOpportunityFromIntake(
     const prev = await pgGetOpportunity(id);
     if (!prev) return null;
     const n = fields.normalised;
-    const matchedPipeline = !fields.lowRelevance && fields.lane !== "Other";
     return pgUpdateOpportunity(id, {
       refNo: n.refNo,
       title: n.title,
@@ -362,7 +362,8 @@ export async function updateOpportunityFromIntake(
       contactName: n.contact?.name ?? null,
       contactEmail: n.contact?.email ?? null,
       contactPhone: n.contact?.telephone ?? null,
-      inPipeline: prev.inPipeline || matchedPipeline,
+      // Never auto-promote on amend — keep existing board membership.
+      inPipeline: prev.inPipeline,
       isAmended: true,
       amendedAt: new Date().toISOString(),
     });
@@ -376,7 +377,6 @@ export async function updateOpportunityFromIntake(
   const now = new Date().toISOString();
   const prev = withOpportunityDefaults(items[index]);
 
-  const matchedPipeline = !fields.lowRelevance && fields.lane !== "Other";
   items[index] = withOpportunityDefaults({
     ...prev,
     refNo: n.refNo,
@@ -408,7 +408,7 @@ export async function updateOpportunityFromIntake(
     contactName: n.contact?.name ?? null,
     contactEmail: n.contact?.email ?? null,
     contactPhone: n.contact?.telephone ?? null,
-    inPipeline: prev.inPipeline || matchedPipeline,
+    inPipeline: prev.inPipeline,
     searchText: buildSearchText({
       title: n.title,
       description: n.description,

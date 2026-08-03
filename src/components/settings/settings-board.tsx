@@ -26,6 +26,7 @@ const emptyUser = {
   name: "",
   email: "",
   role: "member" as UserRole,
+  password: "",
 };
 
 export function SettingsBoard() {
@@ -35,9 +36,12 @@ export function SettingsBoard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [saved, setSaved] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
+  const [userNotice, setUserNotice] = useState<string | null>(null);
   const [categoryRows, setCategoryRows] = useState<CategoryRow[]>([]);
   const [categorySaved, setCategorySaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [resetPasswordFor, setResetPasswordFor] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
 
   useEffect(() => {
     void fetch("/api/settings")
@@ -96,6 +100,11 @@ export function SettingsBoard() {
   function addUser(e: React.FormEvent) {
     e.preventDefault();
     setUserError(null);
+    setUserNotice(null);
+    if (userForm.password.trim().length < 8) {
+      setUserError("Password must be at least 8 characters.");
+      return;
+    }
     startTransition(async () => {
       const res = await fetch("/api/settings/users", {
         method: "POST",
@@ -110,12 +119,17 @@ export function SettingsBoard() {
       setSettings((prev) =>
         prev && data.users ? { ...prev, users: data.users } : prev,
       );
+      setUserNotice(
+        data.message ??
+          `${userForm.name} can now sign in at /login with the password you set.`,
+      );
       setUserForm(emptyUser);
       setShowAddUser(false);
     });
   }
 
   function changeRole(id: string, role: UserRole) {
+    setUserError(null);
     startTransition(async () => {
       const res = await fetch("/api/settings/users", {
         method: "PATCH",
@@ -133,8 +147,36 @@ export function SettingsBoard() {
     });
   }
 
+  function saveResetPassword(id: string) {
+    setUserError(null);
+    setUserNotice(null);
+    if (resetPassword.trim().length < 8) {
+      setUserError("Password must be at least 8 characters.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await fetch("/api/settings/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, password: resetPassword.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUserError(data.error ?? "Could not reset password.");
+        return;
+      }
+      setSettings((prev) =>
+        prev && data.users ? { ...prev, users: data.users } : prev,
+      );
+      setUserNotice("Password updated. Share the new password with the user.");
+      setResetPasswordFor(null);
+      setResetPassword("");
+    });
+  }
+
   function removeUser(id: string) {
     setUserError(null);
+    setUserNotice(null);
     startTransition(async () => {
       const res = await fetch("/api/settings/users", {
         method: "DELETE",
@@ -230,9 +272,10 @@ export function SettingsBoard() {
       <section className="mb-8 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-navy/5 md:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-ink">Users</h2>
+            <h2 className="text-base font-semibold text-ink">Portal users</h2>
             <p className="mt-1 text-sm text-muted">
-              Add team members and set their role.
+              Give each teammate their own login. Admins can add users here;
+              anyone can also create an account from the sign-in page.
             </p>
           </div>
           <button
@@ -240,6 +283,7 @@ export function SettingsBoard() {
             onClick={() => {
               setShowAddUser((v) => !v);
               setUserError(null);
+              setUserNotice(null);
             }}
             className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
           >
@@ -296,7 +340,21 @@ export function SettingsBoard() {
                 ))}
               </select>
             </label>
-            <div className="flex items-end">
+            <label className="block">
+              <span className="label-mono">Temporary password</span>
+              <input
+                required
+                type="text"
+                minLength={8}
+                value={userForm.password}
+                onChange={(e) =>
+                  setUserForm((f) => ({ ...f, password: e.target.value }))
+                }
+                placeholder="Min. 8 characters — share with them"
+                className="mt-1.5 w-full rounded-xl border border-navy/10 bg-white px-3 py-2.5 font-mono text-sm outline-none ring-mint/40 focus:ring-2"
+              />
+            </label>
+            <div className="flex items-end md:col-span-2">
               <button
                 type="submit"
                 disabled={pending}
@@ -313,47 +371,90 @@ export function SettingsBoard() {
             {userError}
           </p>
         ) : null}
+        {userNotice ? (
+          <p className="mt-3 text-sm font-semibold text-navy" role="status">
+            {userNotice}
+          </p>
+        ) : null}
 
         <ul className="mt-5 divide-y divide-navy/5">
           {settings.users.map((user: AppUser) => {
             const isPrimary = user.email === "nsomdyala@maxattention.tech";
+            const resetting = resetPasswordFor === user.id;
             return (
               <li
                 key={user.id}
-                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink">{user.name}</p>
-                  <p className="font-mono text-xs text-muted">{user.email}</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink">{user.name}</p>
+                    <p className="font-mono text-xs text-muted">{user.email}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="sr-only" htmlFor={`role-${user.id}`}>
+                      Role for {user.name}
+                    </label>
+                    <select
+                      id={`role-${user.id}`}
+                      value={user.role}
+                      disabled={pending || isPrimary}
+                      onChange={(e) =>
+                        changeRole(user.id, e.target.value as UserRole)
+                      }
+                      className="rounded-xl border border-navy/10 bg-mist/40 px-3 py-2 text-sm text-ink outline-none ring-mint/40 focus:bg-white focus:ring-2 disabled:opacity-60"
+                    >
+                      {USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {roleLabel[role]}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        setResetPasswordFor(resetting ? null : user.id);
+                        setResetPassword("");
+                        setUserError(null);
+                      }}
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-navy hover:bg-mist"
+                    >
+                      {resetting ? "Cancel" : "Reset password"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending || isPrimary}
+                      onClick={() => removeUser(user.id)}
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-coral hover:bg-coral/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="sr-only" htmlFor={`role-${user.id}`}>
-                    Role for {user.name}
-                  </label>
-                  <select
-                    id={`role-${user.id}`}
-                    value={user.role}
-                    disabled={pending || isPrimary}
-                    onChange={(e) =>
-                      changeRole(user.id, e.target.value as UserRole)
-                    }
-                    className="rounded-xl border border-navy/10 bg-mist/40 px-3 py-2 text-sm text-ink outline-none ring-mint/40 focus:bg-white focus:ring-2 disabled:opacity-60"
-                  >
-                    {USER_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {roleLabel[role]}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={pending || isPrimary}
-                    onClick={() => removeUser(user.id)}
-                    className="rounded-xl px-3 py-2 text-sm font-semibold text-coral hover:bg-coral/10 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Remove
-                  </button>
-                </div>
+                {resetting ? (
+                  <div className="flex flex-col gap-2 rounded-xl bg-mist/40 p-3 sm:flex-row sm:items-end">
+                    <label className="block min-w-0 flex-1">
+                      <span className="label-mono">New password</span>
+                      <input
+                        type="text"
+                        minLength={8}
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        placeholder="Min. 8 characters"
+                        className="mt-1.5 w-full rounded-xl border border-navy/10 bg-white px-3 py-2.5 font-mono text-sm outline-none ring-mint/40 focus:ring-2"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => saveResetPassword(user.id)}
+                      className="rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                      Save password
+                    </button>
+                  </div>
+                ) : null}
               </li>
             );
           })}

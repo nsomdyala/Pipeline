@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth/session";
 import { addReply } from "@/lib/discussions/store";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params;
+  const session = await getSession();
   const body = (await request.json()) as { body?: string };
   if (!body.body?.trim()) {
-    return NextResponse.json({ error: "Reply body is required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Reply body is required." },
+      { status: 400 },
+    );
   }
-  const topic = await addReply(id, body.body);
+  const topic = await addReply(id, body.body, session?.name);
   if (!topic) {
     return NextResponse.json({ error: "Topic not found." }, { status: 404 });
   }

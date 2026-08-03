@@ -64,8 +64,12 @@ export type NormalisedOpportunity = {
   panelTerm: string | null;
   /** title + description + category for shared matchers */
   matchText: string;
-  /** Hint from source text / method; pipeline may override with panel. */
-  procurementHint: "tender" | "rfq" | null;
+  /** OCDS tender.id (often the numeric eTenders id, not the buyer ref). */
+  tenderId: string | null;
+  /** OCDS tender.procurementMethod (e.g. open). */
+  procurementMethod: string | null;
+  /** OCDS tender.procurementMethodDetails (e.g. Request for Quotation). */
+  procurementMethodDetails: string | null;
 };
 
 export interface SourceAdapter {

@@ -34,7 +34,7 @@ export const OPP_SOURCES = [
   "Email",
 ] as const;
 
-export const OPPORTUNITY_TYPES = ["tender", "rfq", "panel"] as const;
+export const OPPORTUNITY_TYPES = ["tender", "rfq", "rfp", "panel"] as const;
 
 export type OppLane = (typeof OPP_LANES)[number];
 export type OppStage = (typeof OPP_STAGES)[number];

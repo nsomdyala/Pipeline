@@ -166,6 +166,12 @@ export function LoginLanding() {
                     ? "Create account"
                     : "Sign in"}
               </button>
+
+              <p className="text-center text-xs text-white/45">
+                {mode === "register"
+                  ? "Creates a bid team member account for this portal."
+                  : "Each teammate signs in with their own email and password."}
+              </p>
             </form>
           </div>
         ) : null}

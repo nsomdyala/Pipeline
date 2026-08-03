@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth/session";
 import { createTopic, listTopics } from "@/lib/discussions/store";
 import { TOPIC_CATEGORIES, type TopicCategory } from "@/lib/discussions/types";
 
@@ -7,6 +8,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession();
   const body = (await request.json()) as {
     title?: string;
     category?: string;
@@ -27,6 +29,7 @@ export async function POST(request: Request) {
     category: body.category as TopicCategory,
     body: body.body,
     linkedTo: body.linkedTo,
+    authorName: session?.name,
   });
   return NextResponse.json({ topic }, { status: 201 });
 }
