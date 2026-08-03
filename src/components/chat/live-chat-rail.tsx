@@ -7,11 +7,26 @@ const STORAGE_KEY = "pipeline.chatRailOpen";
 const OPEN_EVENT = "pipeline:open-chat";
 
 function formatTime(iso: string) {
+  const date = new Date(iso);
+  const now = new Date();
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) {
+    return new Intl.DateTimeFormat("en-ZA", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Africa/Johannesburg",
+    }).format(date);
+  }
   return new Intl.DateTimeFormat("en-ZA", {
+    day: "2-digit",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Africa/Johannesburg",
-  }).format(new Date(iso));
+  }).format(date);
 }
 
 function initials(name: string) {
@@ -85,14 +100,22 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
 
   async function loadChannels() {
     const res = await fetch("/api/chat/channels");
-    if (!res.ok) throw new Error("Could not load channels.");
-    const data = (await res.json()) as { channels: Channel[] };
-    setChannels(data.channels);
+    const data = (await res.json()) as {
+      channels?: Channel[];
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error ?? "Could not load channels.");
+    }
+    setChannels(data.channels ?? []);
+    setError(null);
     setActiveId((current) => {
-      if (current && data.channels.some((c) => c.id === current)) return current;
+      if (current && (data.channels ?? []).some((c) => c.id === current)) {
+        return current;
+      }
       return (
-        data.channels.find((c) => c.name === "general")?.id ??
-        data.channels[0]?.id ??
+        data.channels?.find((c) => c.name === "general")?.id ??
+        data.channels?.[0]?.id ??
         null
       );
     });
@@ -100,14 +123,20 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
 
   async function loadMessages(channelId: string, soft = false) {
     const res = await fetch(`/api/chat/channels/${channelId}/messages`);
-    if (!res.ok) throw new Error("Could not load messages.");
-    const data = (await res.json()) as { messages: ChatMessage[] };
-    setMessages(data.messages);
-    if (soft && data.messages.length > lastCountRef.current) {
+    const data = (await res.json()) as {
+      messages?: ChatMessage[];
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error ?? "Could not load messages.");
+    }
+    setMessages(data.messages ?? []);
+    if (!soft) setError(null);
+    if (soft && (data.messages?.length ?? 0) > lastCountRef.current) {
       setLivePulse(true);
       window.setTimeout(() => setLivePulse(false), 1200);
     }
-    lastCountRef.current = data.messages.length;
+    lastCountRef.current = data.messages?.length ?? 0;
   }
 
   useEffect(() => {
@@ -115,8 +144,12 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
     (async () => {
       try {
         await loadChannels();
-      } catch {
-        if (!cancelled) setError("Could not load chat.");
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Could not load chat.",
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -133,8 +166,12 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
     (async () => {
       try {
         await loadMessages(activeId);
-      } catch {
-        if (!cancelled) setError("Could not load messages.");
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Could not load messages.",
+          );
+        }
       }
     })();
 
@@ -231,7 +268,9 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
               Live chat
             </p>
           </div>
-          <p className="mt-0.5 text-xs text-muted">Visible on every page</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Visible on every page · history kept
+          </p>
         </div>
         <button
           type="button"

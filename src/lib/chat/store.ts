@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 import { seedChannels, seedMessages } from "@/lib/chat/seed";
+import { readJsonFile, writeJsonFile } from "@/lib/json-store";
 import type {
   Channel,
   ChatMessage,
@@ -9,48 +10,43 @@ import type {
   CreateMessageInput,
 } from "@/lib/chat/types";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
-const CHANNELS_FILE = path.join(DATA_DIR, "chat-channels.json");
-const MESSAGES_FILE = path.join(DATA_DIR, "chat-messages.json");
+const CHANNELS_FILE = "chat-channels.json";
+const MESSAGES_FILE = "chat-messages.json";
 
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  await mkdir(DATA_DIR, { recursive: true });
-  try {
-    const raw = await readFile(file, "utf8");
-    return JSON.parse(raw) as T;
-  } catch {
-    await writeFile(file, JSON.stringify(fallback, null, 2), "utf8");
-    return fallback;
-  }
-}
-
-async function writeJson<T>(file: string, data: T) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(file, JSON.stringify(data, null, 2), "utf8");
+function usePostgres() {
+  return Boolean(process.env.DATABASE_URL?.trim());
 }
 
 async function ensureChannels(): Promise<Channel[]> {
-  const existing = await readJson<Channel[]>(CHANNELS_FILE, []);
+  const existing = await readJsonFile<Channel[]>(CHANNELS_FILE, []);
   if (existing.length > 0) return existing;
   const seeded = seedChannels();
-  await writeJson(CHANNELS_FILE, seeded);
+  await writeJsonFile(CHANNELS_FILE, seeded);
   return seeded;
 }
 
 async function ensureMessages(): Promise<ChatMessage[]> {
-  const existing = await readJson<ChatMessage[]>(MESSAGES_FILE, []);
+  const existing = await readJsonFile<ChatMessage[]>(MESSAGES_FILE, []);
   if (existing.length > 0) return existing;
   const seeded = seedMessages();
-  await writeJson(MESSAGES_FILE, seeded);
+  await writeJsonFile(MESSAGES_FILE, seeded);
   return seeded;
 }
 
 export async function listChannels(): Promise<Channel[]> {
+  if (usePostgres()) {
+    const { pgListChannels } = await import("@/lib/chat/pg-store");
+    return pgListChannels();
+  }
   const channels = await ensureChannels();
   return channels.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getChannel(id: string): Promise<Channel | null> {
+  if (usePostgres()) {
+    const { pgGetChannel } = await import("@/lib/chat/pg-store");
+    return pgGetChannel(id);
+  }
   const channels = await ensureChannels();
   return channels.find((c) => c.id === id) ?? null;
 }
@@ -58,6 +54,11 @@ export async function getChannel(id: string): Promise<Channel | null> {
 export async function createChannel(
   input: CreateChannelInput,
 ): Promise<Channel> {
+  if (usePostgres()) {
+    const { pgCreateChannel } = await import("@/lib/chat/pg-store");
+    return pgCreateChannel(input);
+  }
+
   const name = input.name
     .trim()
     .replace(/^#/, "")
@@ -81,11 +82,15 @@ export async function createChannel(
   };
 
   channels.push(channel);
-  await writeJson(CHANNELS_FILE, channels);
+  await writeJsonFile(CHANNELS_FILE, channels);
   return channel;
 }
 
 export async function listMessages(channelId: string): Promise<ChatMessage[]> {
+  if (usePostgres()) {
+    const { pgListMessages } = await import("@/lib/chat/pg-store");
+    return pgListMessages(channelId);
+  }
   const messages = await ensureMessages();
   return messages
     .filter((m) => m.channelId === channelId)
@@ -98,6 +103,11 @@ export async function listMessages(channelId: string): Promise<ChatMessage[]> {
 export async function createMessage(
   input: CreateMessageInput,
 ): Promise<ChatMessage> {
+  if (usePostgres()) {
+    const { pgCreateMessage } = await import("@/lib/chat/pg-store");
+    return pgCreateMessage(input);
+  }
+
   const channel = await getChannel(input.channelId);
   if (!channel) throw new Error("Channel not found.");
 
@@ -114,6 +124,6 @@ export async function createMessage(
 
   const messages = await ensureMessages();
   messages.push(message);
-  await writeJson(MESSAGES_FILE, messages);
+  await writeJsonFile(MESSAGES_FILE, messages);
   return message;
 }

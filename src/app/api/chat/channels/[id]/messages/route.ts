@@ -9,13 +9,27 @@ import {
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  const { id } = await params;
-  const channel = await getChannel(id);
-  if (!channel) {
-    return NextResponse.json({ error: "Channel not found." }, { status: 404 });
+  try {
+    const { id } = await params;
+    const channel = await getChannel(id);
+    if (!channel) {
+      return NextResponse.json({ error: "Channel not found." }, { status: 404 });
+    }
+    const messages = await listMessages(id);
+    return NextResponse.json({ channel, messages });
+  } catch (err) {
+    console.error("chat messages list failed", err);
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Could not load messages. Check DATABASE_URL.",
+        messages: [],
+      },
+      { status: 500 },
+    );
   }
-  const messages = await listMessages(id);
-  return NextResponse.json({ channel, messages });
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -37,8 +51,12 @@ export async function POST(request: Request, { params }: Params) {
     });
     return NextResponse.json({ message }, { status: 201 });
   } catch (err) {
+    console.error("chat message create failed", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Could not send message." },
+      {
+        error:
+          err instanceof Error ? err.message : "Could not send message.",
+      },
       { status: 400 },
     );
   }
