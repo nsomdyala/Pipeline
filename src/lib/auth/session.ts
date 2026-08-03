@@ -9,6 +9,7 @@ export type SessionUser = {
   name: string;
   email: string;
   role: UserRole;
+  avatarUrl?: string | null;
 };
 
 export function encodeSession(user: SessionUser) {

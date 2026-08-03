@@ -42,6 +42,8 @@ export const users = pgTable(
     email: text("email").notNull(),
     role: text("role").notNull().default("member"),
     passwordHash: text("password_hash").notNull(),
+    /** Public URL (or storage path) for the user's profile picture. */
+    avatarUrl: text("avatar_url"),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_uidx").on(t.email)],

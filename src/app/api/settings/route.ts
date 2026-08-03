@@ -18,6 +18,7 @@ async function settingsWithDbUsers() {
         name: u.name,
         email: u.email,
         role: u.role as "admin" | "member" | "viewer",
+        avatarUrl: u.avatarUrl ?? null,
       })),
     };
   } catch (err) {
@@ -60,6 +61,7 @@ export async function PUT(request: Request) {
           name: u.name,
           email: u.email,
           role: u.role as "admin" | "member" | "viewer",
+          avatarUrl: u.avatarUrl ?? null,
         })),
       });
     } catch {

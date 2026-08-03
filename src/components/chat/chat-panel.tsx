@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import type { Channel, ChatMessage } from "@/lib/chat/types";
 
 function formatTime(iso: string) {
@@ -13,13 +14,6 @@ function formatTime(iso: string) {
   }).format(new Date(iso));
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export function ChatPanel() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -246,17 +240,12 @@ export function ChatPanel() {
                 messages.map((message) => (
                   <article
                     key={message.id}
-                    className="flex gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-navy/5"
+                    className="row-hover flex gap-3 rounded-[var(--radius-lg)] border border-[var(--slack-border)] bg-white px-4 py-3"
                   >
-                    <div
-                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-navy font-mono text-xs font-semibold text-mint"
-                      aria-hidden
-                    >
-                      {initials(message.authorName)}
-                    </div>
+                    <Avatar name={message.authorName} size={36} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="text-sm font-semibold text-ink">
+                        <span className="text-sm font-bold text-ink">
                           {message.authorName}
                         </span>
                         <time className="font-mono text-[0.7rem] text-muted">

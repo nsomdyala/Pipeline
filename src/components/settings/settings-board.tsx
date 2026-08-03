@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { ProfileAvatarCard } from "@/components/settings/profile-avatar-card";
+import { Avatar } from "@/components/ui/avatar";
 import { OPP_LANES, type OppLane } from "@/lib/opportunities/types";
 import {
   USER_ROLES,
@@ -210,10 +212,12 @@ export function SettingsBoard() {
           Settings
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          Manage company profile, team users and roles for Max Attention
+          Manage your photo, company profile, and team users for Max Attention
           Technologies.
         </p>
       </header>
+
+      <ProfileAvatarCard />
 
       <form
         onSubmit={saveCompany}
@@ -387,9 +391,18 @@ export function SettingsBoard() {
                 className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">{user.name}</p>
-                    <p className="font-mono text-xs text-muted">{user.email}</p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar
+                      name={user.name}
+                      src={user.avatarUrl}
+                      size={36}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink">
+                        {user.name}
+                      </p>
+                      <p className="font-mono text-xs text-muted">{user.email}</p>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="sr-only" htmlFor={`role-${user.id}`}>

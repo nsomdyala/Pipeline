@@ -3,26 +3,82 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import {
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  FolderKanban,
+  Gavel,
+  Handshake,
+  LayoutDashboard,
+  MessageSquare,
+  MessagesSquare,
+  PanelLeft,
+  Settings,
+  Users,
+} from "lucide-react";
 import { openLiveChat } from "@/components/chat/live-chat-rail";
-import { navItems } from "@/lib/nav";
+import { Avatar } from "@/components/ui/avatar";
+import {
+  navItems,
+  navSections,
+  sectionForPath,
+  type NavItem,
+  type NavSection,
+} from "@/lib/nav";
 
-const sections = [
-  { key: "work", title: "Work" },
-  { key: "collaborate", title: "Collaborate" },
-  { key: "company", title: "Company" },
-] as const;
+const ICONS: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
+  "/": BriefcaseBusiness,
+  "/dashboard": LayoutDashboard,
+  "/tenders": ClipboardList,
+  "/opportunities": FolderKanban,
+  "/leads": Users,
+  "/accounts": Building2,
+  "/partners": Handshake,
+  "/compliance": Gavel,
+  "/proposals": FileText,
+  "/chat": MessageSquare,
+  "/discussions": MessagesSquare,
+  "/calendar": CalendarDays,
+  "/settings": Settings,
+};
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function Sidebar({
-  userName = "Ndumiso Somdyala",
-  role = "Admin",
+  userName = "Guest",
+  role = "Viewer",
+  avatarUrl = null,
 }: {
   userName?: string;
   role?: string;
+  avatarUrl?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const activeSection = sectionForPath(pathname);
+  const [openSections, setOpenSections] = useState<Record<NavSection, boolean>>({
+    work: true,
+    collaborate: true,
+    company: true,
+  });
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const railItems = useMemo(
+    () => navItems.filter((item) => item.rail),
+    [],
+  );
+
+  const pageTitle =
+    navItems.find((item) => isActive(pathname, item.href))?.label ?? "Pipeline";
 
   function signOut() {
     startTransition(async () => {
@@ -32,88 +88,170 @@ export function Sidebar({
     });
   }
 
+  function toggleSection(key: NavSection) {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function onNavClick(item: NavItem) {
+    if (item.href === "/chat") openLiveChat();
+    setMobileSidebarOpen(false);
+  }
+
   return (
-    <aside className="flex h-full w-[var(--sidebar-width)] shrink-0 flex-col bg-navy text-white">
-      <div className="flex items-center gap-3 px-5 pt-6 pb-5">
-        <Image
-          src="/brand/pipeline-mark-primary.svg"
-          alt="Pipeline"
-          width={36}
-          height={36}
-          priority
-        />
-        <div className="min-w-0">
-          <div className="wordmark text-[1.05rem] leading-none">Pipeline</div>
-          <div className="label-mono mt-1.5 text-[0.625rem] text-white/45">
-            Aura Workstream
-          </div>
-        </div>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Main">
-        {sections.map((section) => {
-          const items = navItems.filter((item) => item.section === section.key);
-          return (
-            <div key={section.key} className="mb-5">
-              <div className="label-mono px-2 mb-2 text-white/35">
-                {section.title}
-              </div>
-              <ul className="space-y-0.5">
-                {items.map((item) => {
-                  const active =
-                    item.href === "/"
-                      ? pathname === "/"
-                      : pathname.startsWith(item.href);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={() => {
-                          if (item.href === "/chat") openLiveChat();
-                        }}
-                        className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
-                          active
-                            ? "bg-mint/15 text-mint"
-                            : "text-white/75 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
-      </nav>
-
-      <div className="border-t border-white/10 px-4 py-4">
-        <div className="flex items-center gap-3">
+    <div className="workspace-shell relative flex h-full shrink-0">
+      {/* Far-left workspace rail */}
+      <aside
+        className="workspace-rail flex h-full w-[var(--workspace-rail-width)] shrink-0 flex-col items-center bg-[var(--slack-aubergine-deep)] py-3 text-white"
+        aria-label="Workspace"
+      >
+        <Link
+          href="/"
+          className="mb-3 flex size-9 items-center justify-center rounded-[var(--radius-avatar)] bg-white/10 ring-1 ring-white/15 transition hover:bg-white/15"
+          title="Pipeline"
+          aria-label="Pipeline home"
+        >
           <Image
-            src="/brand/pipeline-mark-avatar.svg"
-            alt=""
-            width={32}
-            height={32}
+            src="/brand/pipeline-mark-primary.svg"
+            alt="Pipeline"
+            width={22}
+            height={22}
+            priority
           />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold tracking-[-0.02em]">
-              {userName}
-            </div>
-            <div className="label-mono mt-0.5 text-[0.625rem] text-mint">
-              {role}
-            </div>
-          </div>
+        </Link>
+
+        <div className="workspace-rail-scroll flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1">
+          {railItems.map((item) => {
+            const Icon = ICONS[item.href] ?? FolderKanban;
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => onNavClick(item)}
+                title={item.label}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={`flex size-9 items-center justify-center rounded-[var(--radius-avatar)] transition ${
+                  active
+                    ? "bg-[var(--slack-rail-active)] text-white"
+                    : "text-[var(--slack-sidebar-text)] hover:bg-[var(--slack-aubergine-hover)] hover:text-white"
+                }`}
+              >
+                <Icon size={18} />
+              </Link>
+            );
+          })}
         </div>
+
         <button
           type="button"
-          onClick={signOut}
-          disabled={pending}
-          className="mt-3 w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-white/50 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+          className="mt-2 flex size-9 items-center justify-center rounded-[var(--radius-avatar)] text-[var(--slack-sidebar-text)] hover:bg-[var(--slack-aubergine-hover)] hover:text-white md:hidden"
+          aria-label="Toggle sidebar"
+          onClick={() => setMobileSidebarOpen((v) => !v)}
         >
-          {pending ? "Signing out…" : "Sign out"}
+          <PanelLeft size={18} />
         </button>
-      </div>
-    </aside>
+      </aside>
+
+      {/* Area sidebar — channel-style list */}
+      <aside
+        className={`area-sidebar flex h-full w-[var(--sidebar-width)] shrink-0 flex-col bg-navy text-[var(--slack-sidebar-text)] ${
+          mobileSidebarOpen ? "area-sidebar-open" : ""
+        }`}
+        aria-label="Channels"
+      >
+        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="wordmark truncate text-[0.95rem]">Pipeline</div>
+            <div className="mt-0.5 text-[0.65rem] text-white/45">
+              Aura Workstream
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Main">
+          {navSections.map((section) => {
+            const items = navItems.filter((item) => item.section === section.key);
+            const open = openSections[section.key];
+            const sectionActive = activeSection === section.key;
+            return (
+              <div key={section.key} className="mb-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.key)}
+                  className={`flex w-full items-center gap-1 rounded-[var(--radius-md)] px-2 py-1 text-left text-[0.7rem] font-semibold uppercase tracking-[0.06em] transition hover:bg-white/5 ${
+                    sectionActive
+                      ? "text-[var(--slack-sidebar-text-active)]"
+                      : "text-[var(--slack-sidebar-section)]"
+                  }`}
+                  aria-expanded={open}
+                >
+                  <ChevronDown
+                    size={14}
+                    className={`transition ${open ? "" : "-rotate-90"}`}
+                  />
+                  {section.title}
+                </button>
+                {open ? (
+                  <ul className="mt-0.5 space-y-px">
+                    {items.map((item) => {
+                      const Icon = ICONS[item.href] ?? FolderKanban;
+                      const active = isActive(pathname, item.href);
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            onClick={() => onNavClick(item)}
+                            className={`flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-[0.35rem] text-[0.875rem] transition ${
+                              active
+                                ? "bg-[var(--slack-aubergine-hover)] font-semibold text-white"
+                                : "text-[var(--slack-sidebar-text)] hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            <Icon size={15} className="opacity-80" />
+                            <span className="truncate">{item.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+              </div>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-white/10 px-3 py-3">
+          <div className="flex items-center gap-2.5">
+            <Avatar name={userName} src={avatarUrl} size={32} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-white">
+                {userName}
+              </div>
+              <div className="truncate text-[0.65rem] text-mint">{role}</div>
+            </div>
+          </div>
+          <div className="mt-2 flex gap-1">
+            <Link
+              href="/settings"
+              className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white"
+            >
+              Profile
+            </Link>
+            <button
+              type="button"
+              onClick={signOut}
+              disabled={pending}
+              className="btn btn-ghost flex-1 justify-start px-2 py-1.5 text-xs text-white/55 hover:text-white disabled:opacity-50"
+            >
+              {pending ? "…" : "Sign out"}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Screen-reader / mobile page context (title lives in main top bar via AppShell) */}
+      <span className="sr-only">{pageTitle}</span>
+    </div>
   );
 }

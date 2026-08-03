@@ -18,7 +18,40 @@ function toSession(user: DbUser): SessionUser {
     name: user.name,
     email: user.email,
     role,
+    avatarUrl: user.avatarUrl ?? null,
   };
+}
+
+export async function findUserById(id: string) {
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return rows[0] ? toSession(rows[0]) : null;
+}
+
+export async function setUserAvatarUrl(id: string, avatarUrl: string | null) {
+  const [row] = await db
+    .update(users)
+    .set({ avatarUrl, updatedAt: new Date() })
+    .where(eq(users.id, id))
+    .returning();
+  if (!row) throw new Error("User not found.");
+  return toSession(row);
+}
+
+/** Resolve avatar URLs for chat/discussion authors by display name (case-insensitive). */
+export async function avatarMapByNames(
+  names: string[],
+): Promise<Record<string, string | null>> {
+  const unique = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  if (unique.length === 0) return {};
+  const all = await listAuthUsers();
+  const map: Record<string, string | null> = {};
+  for (const name of unique) {
+    const match = all.find(
+      (u) => u.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    map[name] = match?.avatarUrl ?? null;
+  }
+  return map;
 }
 
 export async function findUserByEmail(email: string) {

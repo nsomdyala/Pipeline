@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { formatZaDate } from "@/lib/opportunities/dates";
 import {
   TOPIC_CATEGORIES,
@@ -19,6 +20,9 @@ export function DiscussionsBoard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
+  const [avatarByName, setAvatarByName] = useState<Record<string, string | null>>(
+    {},
+  );
 
   useEffect(() => {
     void fetch("/api/discussions")
@@ -27,6 +31,26 @@ export function DiscussionsBoard() {
       .catch(() => setError("Could not load discussions."))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const names = new Set<string>();
+    for (const topic of topics) {
+      if (topic.authorName) names.add(topic.authorName);
+      for (const post of topic.posts) {
+        if (post.authorName) names.add(post.authorName);
+      }
+    }
+    const list = [...names];
+    if (list.length === 0) return;
+    void fetch(`/api/avatars/lookup?names=${encodeURIComponent(list.join("|"))}`)
+      .then((r) => r.json())
+      .then((d: { avatars?: Record<string, string | null> }) => {
+        if (d.avatars) setAvatarByName(d.avatars);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  }, [topics]);
 
   function createTopic(e: React.FormEvent) {
     e.preventDefault();
@@ -185,22 +209,40 @@ export function DiscussionsBoard() {
                 </span>
               ) : null}
             </div>
-            <h2 className="mt-2 text-lg font-semibold text-ink">{topic.title}</h2>
-            <p className="mt-1 text-sm text-muted">
-              {topic.authorName}
-              {topic.linkedTo ? ` · ${topic.linkedTo}` : ""} ·{" "}
-              {formatZaDate(topic.updatedAt)}
-            </p>
+            <div className="mt-2 flex items-start gap-3">
+              <Avatar
+                name={topic.authorName}
+                src={avatarByName[topic.authorName]}
+                size={36}
+              />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-lg font-semibold text-ink">{topic.title}</h2>
+                <p className="mt-1 text-sm text-muted">
+                  {topic.authorName}
+                  {topic.linkedTo ? ` · ${topic.linkedTo}` : ""} ·{" "}
+                  {formatZaDate(topic.updatedAt)}
+                </p>
+              </div>
+            </div>
             <p className="mt-3 text-sm text-ink/85">{topic.body}</p>
             {topic.posts.length > 0 ? (
               <ul className="mt-4 space-y-2 border-t border-navy/5 pt-3">
                 {topic.posts.map((post) => (
-                  <li key={post.id} className="text-sm">
-                    <span className="font-semibold text-ink">{post.authorName}</span>
-                    <span className="ml-2 font-mono text-xs text-muted">
-                      {formatZaDate(post.createdAt)}
-                    </span>
-                    <p className="mt-1 text-ink/80">{post.body}</p>
+                  <li key={post.id} className="flex gap-2.5 text-sm">
+                    <Avatar
+                      name={post.authorName}
+                      src={avatarByName[post.authorName]}
+                      size={28}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-ink">
+                        {post.authorName}
+                      </span>
+                      <span className="ml-2 font-mono text-xs text-muted">
+                        {formatZaDate(post.createdAt)}
+                      </span>
+                      <p className="mt-1 text-ink/80">{post.body}</p>
+                    </div>
                   </li>
                 ))}
               </ul>

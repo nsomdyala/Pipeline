@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import type { Channel, ChatMessage } from "@/lib/chat/types";
 
 const STORAGE_KEY = "pipeline.chatRailOpen";
@@ -29,19 +30,17 @@ function formatTime(iso: string) {
   }).format(date);
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 export function openLiveChat() {
   window.dispatchEvent(new Event(OPEN_EVENT));
 }
 
-export function LiveChatRail({ authorName }: { authorName: string }) {
+export function LiveChatRail({
+  authorName,
+  authorAvatarUrl = null,
+}: {
+  authorName: string;
+  authorAvatarUrl?: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -51,6 +50,9 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [livePulse, setLivePulse] = useState(false);
+  const [avatarByName, setAvatarByName] = useState<Record<string, string | null>>(
+    {},
+  );
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const lastCountRef = useRef(0);
   const active = channels.find((c) => c.id === activeId) ?? null;
@@ -158,6 +160,30 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (authorAvatarUrl) {
+      setAvatarByName((prev) => ({ ...prev, [authorName]: authorAvatarUrl }));
+    }
+  }, [authorName, authorAvatarUrl]);
+
+  useEffect(() => {
+    const names = [...new Set(messages.map((m) => m.authorName).filter(Boolean))];
+    if (names.length === 0) return;
+    let cancelled = false;
+    void fetch(`/api/avatars/lookup?names=${encodeURIComponent(names.join("|"))}`)
+      .then((r) => r.json())
+      .then((d: { avatars?: Record<string, string | null> }) => {
+        if (cancelled || !d.avatars) return;
+        setAvatarByName((prev) => ({ ...prev, ...d.avatars }));
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -317,23 +343,26 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
           </p>
         ) : null}
         {messages.map((message) => (
-          <article key={message.id} className="flex gap-2.5">
-            <div
-              className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-navy font-mono text-[0.6rem] font-semibold text-mint"
-              aria-hidden
-            >
-              {initials(message.authorName)}
-            </div>
+          <article
+            key={message.id}
+            className="row-hover -mx-1 flex gap-2.5 rounded-[var(--radius-md)] px-1 py-1.5"
+          >
+            <Avatar
+              name={message.authorName}
+              src={avatarByName[message.authorName]}
+              size={36}
+              className="mt-0.5"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-1.5">
-                <span className="truncate text-xs font-semibold text-ink">
+                <span className="truncate text-[0.8125rem] font-bold text-ink">
                   {message.authorName}
                 </span>
-                <time className="font-mono text-[0.65rem] text-muted">
+                <time className="text-[0.7rem] text-muted">
                   {formatTime(message.createdAt)}
                 </time>
               </div>
-              <p className="mt-0.5 whitespace-pre-wrap text-[0.8125rem] leading-relaxed text-ink/90">
+              <p className="mt-0.5 whitespace-pre-wrap text-[0.875rem] leading-relaxed text-ink/90">
                 {message.body}
               </p>
             </div>
@@ -357,12 +386,12 @@ export function LiveChatRail({ authorName }: { authorName: string }) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={active ? `Message #${active.name}` : "Message…"}
-            className="min-w-0 flex-1 rounded-xl border border-navy/10 bg-mist/50 px-3 py-2 text-sm text-ink outline-none ring-mint/40 focus:bg-white focus:ring-2"
+            className="field min-w-0 flex-1"
           />
           <button
             type="submit"
             disabled={pending || !draft.trim() || !activeId}
-            className="rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-navy disabled:opacity-50"
+            className="btn btn-primary"
           >
             Send
           </button>

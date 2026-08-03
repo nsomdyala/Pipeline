@@ -17,6 +17,7 @@ function mapUsers(
     name: u.name,
     email: u.email,
     role: u.role as UserRole,
+    avatarUrl: u.avatarUrl ?? null,
   }));
 }
 
