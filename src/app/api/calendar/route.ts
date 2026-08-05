@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { getSession } from "@/lib/auth/session";
 import { createEvent, listEvents } from "@/lib/calendar/store";
 import { mergeTenderClosings } from "@/lib/calendar/tender-closings";
@@ -6,6 +7,9 @@ import { EVENT_KINDS, type EventKind } from "@/lib/calendar/types";
 import { createMessage, listChannels } from "@/lib/chat/store";
 
 export async function GET() {
+  const auth = await requirePermission("calendar", "view");
+  if (!auth.ok) return auth.response;
+
   try {
     const stored = await listEvents();
     const events = await mergeTenderClosings(stored);
@@ -29,6 +33,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("calendar", "create");
+  if (!auth.ok) return auth.response;
+
   const body = (await request.json()) as {
     kind?: string;
     title?: string;

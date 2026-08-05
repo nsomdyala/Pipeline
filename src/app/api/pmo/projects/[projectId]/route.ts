@@ -1,0 +1,39 @@
+import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
+import { getProjectWorkspace } from "@/lib/pmo/store";
+
+type Params = { params: Promise<{ projectId: string }> };
+
+export async function GET(_request: Request, { params }: Params) {
+  const auth = await requirePermission("pmo", "view");
+  if (!auth.ok) return auth.response;
+  const session = auth.session;
+
+  const { projectId } = await params;
+
+  try {
+    const workspace = await getProjectWorkspace(projectId, {
+      role: session.role,
+      userId: session.id,
+      userName: session.name,
+    });
+    if (!workspace) {
+      return NextResponse.json(
+        { error: "Project not found or not assigned to you." },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ workspace });
+  } catch (err) {
+    console.error("[api/pmo/projects/:id]", err);
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Could not load project workspace.",
+      },
+      { status: 500 },
+    );
+  }
+}

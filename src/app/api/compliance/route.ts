@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import {
   listVaultRows,
   uploadComplianceDoc,
@@ -6,11 +7,16 @@ import {
 import { DOC_TYPE_KEYS, type DocTypeKey } from "@/lib/compliance/types";
 
 export async function GET() {
+  const auth = await requirePermission("compliance", "view");
+  if (!auth.ok) return auth.response;
   const rows = await listVaultRows();
   return NextResponse.json({ rows });
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("compliance", "create");
+  if (!auth.ok) return auth.response;
+
   const form = await request.formData();
   const typeKey = String(form.get("typeKey") ?? "") as DocTypeKey;
   const issuedOn = String(form.get("issuedOn") ?? "").trim();

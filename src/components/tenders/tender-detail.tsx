@@ -159,7 +159,7 @@ export function TenderDetail({ id }: { id: string }) {
 
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-navy">
+          <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide ">
             {typeLabel}
           </span>
           <span className="font-mono text-xs font-semibold text-ink">
@@ -267,7 +267,7 @@ export function TenderDetail({ id }: { id: string }) {
                     </span>
                   ) : null}
                 </span>
-                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-navy">
+                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-white">
                   Download
                 </span>
               </a>
@@ -285,7 +285,7 @@ export function TenderDetail({ id }: { id: string }) {
                     {formatBytes(file.size)}
                   </span>
                 </span>
-                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-navy">
+                <span className="shrink-0 rounded-lg bg-mint px-3 py-1.5 text-xs font-semibold text-white">
                   Download
                 </span>
               </a>
@@ -304,21 +304,21 @@ export function TenderDetail({ id }: { id: string }) {
         {item.convertedToLeadId ? (
           <Link
             href="/leads"
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
           >
             Open in Leads
           </Link>
         ) : item.convertedToAccountId ? (
           <Link
             href="/accounts"
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
           >
             Open in Accounts
           </Link>
         ) : item.inPipeline ? (
           <Link
             href="/opportunities"
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
           >
             View on Opportunities
           </Link>

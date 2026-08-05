@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { formatZaDate, formatZar } from "@/lib/opportunities/dates";
 import {
@@ -191,7 +192,7 @@ export function AccountsBoard() {
             setOpen((value) => !value);
             setError(null);
           }}
-          className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy transition-opacity hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 text-white"
         >
           {open ? "Cancel" : "Add account"}
         </button>
@@ -351,7 +352,7 @@ export function AccountsBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
             >
               {pending ? "Saving…" : "Save account"}
             </button>
@@ -397,7 +398,7 @@ export function AccountsBoard() {
                       <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-muted">
                         {account.sector}
                       </span>
-                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                         {statusLabel[account.status]}
                       </span>
                       <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
@@ -410,7 +411,12 @@ export function AccountsBoard() {
                       ) : null}
                     </div>
                     <h3 className="mt-1.5 text-lg font-semibold tracking-[-0.02em] text-ink">
-                      {account.clientName}
+                      <Link
+                        href={`/accounts/${account.id}`}
+                        className="hover:text-[var(--slack-rail-active)] hover:underline"
+                      >
+                        {account.clientName}
+                      </Link>
                     </h3>
                     <p className="mt-1 text-sm text-muted">
                       {account.projectTitle}
@@ -418,6 +424,14 @@ export function AccountsBoard() {
                         ? ` · ${formatZar(account.valueZar)}`
                         : ""}
                     </p>
+                    <div className="mt-2">
+                      <Link
+                        href={`/accounts/${account.id}?tab=pmo`}
+                        className="text-xs font-semibold text-[var(--slack-rail-active)] hover:underline"
+                      >
+                        Open PMO →
+                      </Link>
+                    </div>
                     {account.notes ? (
                       <p className="mt-2 text-sm text-ink/80">{account.notes}</p>
                     ) : null}

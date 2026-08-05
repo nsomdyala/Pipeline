@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { createTopic, listTopics } from "@/lib/discussions/store";
 import { TOPIC_CATEGORIES, type TopicCategory } from "@/lib/discussions/types";
 
 export async function GET() {
+  const auth = await requirePermission("discussions", "view");
+  if (!auth.ok) return auth.response;
   return NextResponse.json({ topics: await listTopics() });
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
+  const auth = await requirePermission("discussions", "create");
+  if (!auth.ok) return auth.response;
+  const session = auth.session;
   const body = (await request.json()) as {
     title?: string;
     category?: string;

@@ -297,7 +297,7 @@ export function CalendarBoard() {
           <button
             type="button"
             onClick={() => openCreate()}
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
           >
             {open && !editingId ? "Cancel" : "Add event"}
           </button>
@@ -308,9 +308,7 @@ export function CalendarBoard() {
         <button
           type="button"
           onClick={() => setKindFilter("all")}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-            kindFilter === "all" ? "bg-navy text-white" : "bg-white text-muted ring-1 ring-navy/10"
-          }`}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${kindFilter === "all" ? "bg-navy text-white" : "bg-white text-muted ring-1 ring-navy/10"}`}
         >
           All
         </button>
@@ -319,11 +317,7 @@ export function CalendarBoard() {
             key={kind}
             type="button"
             onClick={() => setKindFilter(kind)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              kindFilter === kind
-                ? "bg-navy text-white"
-                : "bg-white text-muted ring-1 ring-navy/10"
-            }`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${kindFilter === kind ? "bg-navy text-white" : "bg-white text-muted ring-1 ring-navy/10"}`}
           >
             {kindLabel[kind]}
           </button>
@@ -458,11 +452,7 @@ export function CalendarBoard() {
                     key={name}
                     type="button"
                     onClick={() => toggleAttendee(name)}
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      on
-                        ? "bg-mint/20 text-navy ring-1 ring-mint/40"
-                        : "bg-mist text-muted"
-                    }`}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${on ? "bg-mint/20 text-ink ring-1 ring-mint/40" : "bg-mist text-muted"}`}
                   >
                     {name}
                   </button>
@@ -511,7 +501,7 @@ export function CalendarBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
             >
               {pending ? "Saving…" : editingId ? "Update event" : "Save event"}
             </button>
@@ -563,11 +553,7 @@ export function CalendarBoard() {
                   type="button"
                   onClick={() => setSelectedDay(day)}
                   onDoubleClick={() => openCreate(day)}
-                  className={`min-h-[4.5rem] rounded-xl border p-1.5 text-left transition ${
-                    selected
-                      ? "border-mint bg-mint/10"
-                      : "border-transparent bg-mist/40 hover:border-navy/10"
-                  } ${inMonth ? "" : "opacity-40"}`}
+                  className={`min-h-[4.5rem] rounded-xl border p-1.5 text-left transition ${selected ? "border-mint bg-mint/10" : "border-transparent bg-mist/40 hover:border-navy/10"} ${inMonth ? "" : "opacity-40"}`}
                 >
                   <div
                     className={`mb-1 inline-flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
@@ -767,9 +753,7 @@ export function CalendarBoard() {
                   </div>
                   <div className="text-left md:text-right">
                     <div
-                      className={`font-mono text-sm font-semibold ${
-                        hot ? "text-coral" : "text-ink"
-                      }`}
+                      className={`font-mono text-sm font-semibold ${hot ? "text-coral" : "text-ink"}`}
                     >
                       {formatZaDate(event.startsAt)}
                     </div>

@@ -262,7 +262,7 @@ export function OpportunitiesBoard() {
               setOpen((value) => !value);
               setError(null);
             }}
-            className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy transition-opacity hover:opacity-90"
+            className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 text-white"
           >
             {open ? "Cancel" : "Add opportunity"}
           </button>
@@ -449,7 +449,7 @@ export function OpportunitiesBoard() {
                 type="file"
                 multiple
                 onChange={(e) => setFiles(e.target.files)}
-                className="mt-1.5 block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-mint/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-navy"
+                className="mt-1.5 block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-mint/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:"
               />
               {files && files.length > 0 ? (
                 <p className="mt-1.5 text-xs text-muted">
@@ -479,7 +479,7 @@ export function OpportunitiesBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
             >
               {pending ? "Saving…" : "Save opportunity"}
             </button>
@@ -519,11 +519,7 @@ export function OpportunitiesBoard() {
                 role="tab"
                 aria-selected={typeFilter === value}
                 onClick={() => setTypeFilter(value)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  typeFilter === value
-                    ? "bg-mint text-navy"
-                    : "text-muted hover:text-ink"
-                }`}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${typeFilter === value ? "bg-mint text-white" : "text-muted hover:text-ink"}`}
               >
                 {label}
               </button>
@@ -558,9 +554,7 @@ export function OpportunitiesBoard() {
               return (
                 <li
                   key={item.id}
-                  className={`rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ${
-                    item.isPanel ? "ring-mint/35" : "ring-navy/5"
-                  }`}
+                  className={`rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ${item.isPanel ? "ring-mint/35" : "ring-navy/5"}`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
@@ -569,7 +563,7 @@ export function OpportunitiesBoard() {
                           {displayTenderRef(item)}
                         </span>
                         {item.isPanel ? (
-                          <span className="rounded-md bg-mint px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-navy">
+                          <span className="rounded-md bg-mint px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-white">
                             Panel
                           </span>
                         ) : (
@@ -587,7 +581,7 @@ export function OpportunitiesBoard() {
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
                           {item.source}
                         </span>
-                        <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                        <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                           {item.stage}
                         </span>
                         <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
@@ -599,7 +593,7 @@ export function OpportunitiesBoard() {
                           </span>
                         ) : null}
                         {item.isAmended ? (
-                          <span className="rounded-md bg-coral/15 px-2 py-0.5 text-[0.65rem] font-semibold text-coral">
+                          <span className="pill pill-overdue">
                             Amended
                           </span>
                         ) : null}
@@ -705,16 +699,12 @@ export function OpportunitiesBoard() {
                     <div className="shrink-0 text-left md:text-right">
                       <div className="label-mono">Closing</div>
                       <div
-                        className={`mt-1 font-mono text-sm font-semibold ${
-                          atRisk ? "text-coral" : "text-ink"
-                        }`}
+                        className={`mt-1 font-mono text-sm font-semibold ${atRisk ? "text-coral" : "text-ink"}`}
                       >
                         {formatZaClosing(item.closingAt)}
                       </div>
                       <div
-                        className={`mt-0.5 text-xs font-semibold ${
-                          atRisk ? "text-coral" : "text-muted"
-                        }`}
+                        className={`mt-0.5 text-xs font-semibold ${atRisk ? "text-coral" : "text-muted"}`}
                       >
                         {days} working {days === 1 ? "day" : "days"} left
                       </div>

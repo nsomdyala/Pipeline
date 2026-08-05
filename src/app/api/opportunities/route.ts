@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { persistUploadedFiles } from "@/lib/opportunities/files";
 import {
   addFilesToOpportunity,
@@ -17,6 +18,9 @@ import {
 } from "@/lib/opportunities/types";
 
 export async function GET(request: Request) {
+  const auth = await requirePermission("opportunities", "view");
+  if (!auth.ok) return auth.response;
+
   const { searchParams } = new URL(request.url);
   const scope =
     searchParams.get("scope") === "all" ? "all" : ("pipeline" as const);
@@ -84,6 +88,9 @@ function parseForm(form: FormData): CreateOpportunityInput | { error: string } {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("opportunities", "create");
+  if (!auth.ok) return auth.response;
+
   const form = await request.formData();
   const parsed = parseForm(form);
   if ("error" in parsed) {

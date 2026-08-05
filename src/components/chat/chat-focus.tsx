@@ -22,7 +22,7 @@ export function ChatFocus() {
       <button
         type="button"
         onClick={() => openLiveChat()}
-        className="mt-6 rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+        className="mt-6 rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
       >
         Open live chat
       </button>

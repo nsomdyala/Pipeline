@@ -3,14 +3,14 @@
 import { useState } from "react";
 
 const PALETTE = [
-  "#E01E5A",
-  "#E8912D",
-  "#2BAC76",
-  "#1164A3",
-  "#611F69",
-  "#3F0E40",
-  "#1FC79C",
-  "#1264A3",
+  "#A8652C",
+  "#3D6B52",
+  "#3F6588",
+  "#B04A3A",
+  "#B0892E",
+  "#2A2E22",
+  "#787465",
+  "#8F5424",
 ];
 
 export function initialsFromName(name: string): string {
@@ -35,7 +35,7 @@ type AvatarProps = {
   className?: string;
 };
 
-/** Slack-style rounded-square avatar with initials fallback. */
+/** Soft-square avatar with Clay Bureau initials fallback. */
 export function Avatar({ name, src, size = 32, className = "" }: AvatarProps) {
   const [broken, setBroken] = useState(false);
   const showImage = Boolean(src) && !broken;

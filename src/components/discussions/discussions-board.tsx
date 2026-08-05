@@ -110,7 +110,7 @@ export function DiscussionsBoard() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
         >
           {open ? "Cancel" : "Start discussion"}
         </button>
@@ -165,7 +165,7 @@ export function DiscussionsBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
             >
               Post topic
             </button>
@@ -199,7 +199,7 @@ export function DiscussionsBoard() {
                 {topic.category}
               </span>
               {topic.pinned ? (
-                <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                   Pinned
                 </span>
               ) : null}

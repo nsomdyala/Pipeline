@@ -1,4 +1,4 @@
-export type NavSection = "work" | "collaborate" | "company";
+export type NavSection = "work" | "collaborate" | "ideas" | "company";
 
 export type NavItem = {
   href: string;
@@ -7,12 +7,17 @@ export type NavItem = {
 };
 
 export const navItems: NavItem[] = [
-  { href: "/", label: "My work", section: "work" },
+  { href: "/", label: "Dashboard", section: "work" },
+  { href: "/my-work", label: "My work", section: "work" },
   { href: "/dashboard", label: "Team hub", section: "work" },
   { href: "/tenders", label: "All Tenders", section: "work" },
   { href: "/opportunities", label: "Opportunities", section: "work" },
   { href: "/leads", label: "Leads", section: "work" },
   { href: "/accounts", label: "Accounts", section: "work" },
+  { href: "/pmo", label: "PMO", section: "work" },
+  { href: "/ideas", label: "Ideas", section: "ideas" },
+  { href: "/rd", label: "Research & Development", section: "ideas" },
+  { href: "/company", label: "Company profile", section: "company" },
   { href: "/partners", label: "Partners", section: "company" },
   { href: "/compliance", label: "Compliance", section: "company" },
   { href: "/proposals", label: "Proposals", section: "company" },
@@ -25,6 +30,7 @@ export const navItems: NavItem[] = [
 export const navSections: Array<{ key: NavSection; title: string }> = [
   { key: "work", title: "Work" },
   { key: "collaborate", title: "Collaborate" },
+  { key: "ideas", title: "Ideas & R&D" },
   { key: "company", title: "Company" },
 ];
 

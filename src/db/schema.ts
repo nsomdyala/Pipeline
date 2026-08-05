@@ -33,6 +33,9 @@ export const profiles = pgTable("profiles", {
 /**
  * Auth users — credentials live in Postgres (Vercel-safe).
  * Prefer this over the legacy profiles table for login/registration.
+ *
+ * Role is a system key (admin|member|viewer|client) or a custom app_roles.key.
+ * Status: active | invited | suspended | deactivated (soft-delete).
  */
 export const users = pgTable(
   "users",
@@ -44,9 +47,46 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     /** Public URL (or storage path) for the user's profile picture. */
     avatarUrl: text("avatar_url"),
+    /** active | invited | suspended | deactivated */
+    status: text("status").notNull().default("active"),
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+    deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+    inviteTokenHash: text("invite_token_hash"),
+    inviteExpiresAt: timestamp("invite_expires_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_uidx").on(t.email)],
+);
+
+/** Named roles (system + custom) for the permissions matrix. */
+export const appRoles = pgTable("app_roles", {
+  key: text("key").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  isSystem: boolean("is_system").notNull().default(false),
+  ...timestamps,
+});
+
+/** module × action allowances per role. */
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    roleKey: text("role_key")
+      .notNull()
+      .references(() => appRoles.key, { onDelete: "cascade" }),
+    module: text("module").notNull(),
+    action: text("action").notNull(),
+    allowed: boolean("allowed").notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("role_permissions_role_mod_act_uidx").on(
+      t.roleKey,
+      t.module,
+      t.action,
+    ),
+  ],
 );
 
 export const companyProfile = pgTable("company_profile", {
@@ -337,6 +377,9 @@ export const partners = pgTable("partners", {
 export const contacts = pgTable("contacts", {
   id: uuid("id").defaultRandom().primaryKey(),
   buyerId: uuid("buyer_id").references(() => buyers.id, { onDelete: "set null" }),
+  /** JSON-store account id (e.g. acct-innovationhub) — not a FK to drizzle accounts. */
+  accountId: text("account_id"),
+  organisation: text("organisation").notNull().default(""),
   name: text("name").notNull(),
   role: text("role").notNull().default(""),
   email: text("email").notNull().default(""),
@@ -691,4 +734,339 @@ export const searchIndex = pgTable(
   (t) => [
     uniqueIndex("search_index_entity_uidx").on(t.entityType, t.entityId),
   ],
+);
+
+/**
+ * PMO projects — linked to JSON-store account ids (text), not drizzle `accounts`.
+ * Status: not_started | in_delivery | on_hold | closed
+ * Health: green | amber | red
+ */
+export const pmoProjects = pgTable(
+  "pmo_projects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    accountId: text("account_id").notNull(),
+    accountName: text("account_name").notNull().default(""),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("not_started"),
+    health: text("health").notNull().default("green"),
+    valueZar: numeric("value_zar", { precision: 14, scale: 2 }),
+    startOn: timestamp("start_on", { withTimezone: true }),
+    dueOn: timestamp("due_on", { withTimezone: true }),
+    projectManagerUserId: text("project_manager_user_id"),
+    projectManagerName: text("project_manager_name").notNull().default(""),
+    sourceOpportunityId: text("source_opportunity_id"),
+    sourceLeadId: text("source_lead_id"),
+    notes: text("notes").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [
+    index("pmo_projects_account_id_idx").on(t.accountId),
+    index("pmo_projects_status_idx").on(t.status),
+    index("pmo_projects_health_idx").on(t.health),
+    index("pmo_projects_pm_idx").on(t.projectManagerUserId),
+  ],
+);
+
+/** Team members assigned to a project (members see only assigned projects). */
+export const pmoProjectAssignments = pgTable(
+  "pmo_project_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => pmoProjects.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("pmo_project_assignments_project_user_uidx").on(
+      t.projectId,
+      t.userId,
+    ),
+    index("pmo_project_assignments_user_idx").on(t.userId),
+  ],
+);
+
+export const pmoAppointmentLetters = pgTable("pmo_appointment_letters", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  letterDate: timestamp("letter_date", { withTimezone: true }),
+  reference: text("reference").notNull().default(""),
+  awardedValueZar: numeric("awarded_value_zar", { precision: 14, scale: 2 }),
+  signatory: text("signatory").notNull().default(""),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  notes: text("notes").notNull().default(""),
+  ...timestamps,
+});
+
+export const pmoSlas = pgTable("pmo_slas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  term: text("term").notNull().default(""),
+  serviceLevels: text("service_levels").notNull().default(""),
+  penalties: text("penalties").notNull().default(""),
+  reviewDates: jsonb("review_dates").notNull().default([]),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  notes: text("notes").notNull().default(""),
+  ...timestamps,
+});
+
+export const pmoPurchaseOrders = pgTable("pmo_purchase_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  poNumber: text("po_number").notNull().default(""),
+  amountZar: numeric("amount_zar", { precision: 14, scale: 2 }),
+  poDate: timestamp("po_date", { withTimezone: true }),
+  remainingBalanceZar: numeric("remaining_balance_zar", {
+    precision: 14,
+    scale: 2,
+  }),
+  linkedInvoiceIds: jsonb("linked_invoice_ids").notNull().default([]),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  notes: text("notes").notNull().default(""),
+  ...timestamps,
+});
+
+export const pmoCharters = pgTable("pmo_charters", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  objectives: text("objectives").notNull().default(""),
+  scopeIn: text("scope_in").notNull().default(""),
+  scopeOut: text("scope_out").notNull().default(""),
+  deliverables: text("deliverables").notNull().default(""),
+  milestones: text("milestones").notNull().default(""),
+  budgetZar: numeric("budget_zar", { precision: 14, scale: 2 }),
+  assumptions: text("assumptions").notNull().default(""),
+  constraints: text("constraints").notNull().default(""),
+  signOff: jsonb("sign_off"),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export const pmoPlans = pgTable("pmo_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  schedule: text("schedule").notNull().default(""),
+  wbs: text("wbs").notNull().default(""),
+  resourcing: text("resourcing").notNull().default(""),
+  budgetPlan: text("budget_plan").notNull().default(""),
+  riskRegister: jsonb("risk_register").notNull().default([]),
+  qualityApproach: text("quality_approach").notNull().default(""),
+  changeControl: text("change_control").notNull().default(""),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export const pmoStatusReports = pgTable("pmo_status_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => pmoProjects.id, { onDelete: "cascade" }),
+  period: text("period").notNull().default(""),
+  cadence: text("cadence").notNull().default("monthly"),
+  progress: text("progress").notNull().default(""),
+  percentComplete: integer("percent_complete").notNull().default(0),
+  milestonesHit: text("milestones_hit").notNull().default(""),
+  risksIssues: text("risks_issues").notNull().default(""),
+  nextSteps: text("next_steps").notNull().default(""),
+  reportedAt: timestamp("reported_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
+  ...timestamps,
+});
+
+export const pmoProjectStakeholders = pgTable(
+  "pmo_project_stakeholders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => pmoProjects.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    influence: text("influence").notNull().default("medium"),
+    interest: text("interest").notNull().default("medium"),
+    engagementNotes: text("engagement_notes").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("pmo_project_stakeholders_project_contact_uidx").on(
+      t.projectId,
+      t.contactId,
+    ),
+  ],
+);
+
+export const pmoStakeholderComms = pgTable("pmo_stakeholder_comms", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stakeholderId: uuid("stakeholder_id")
+    .notNull()
+    .references(() => pmoProjectStakeholders.id, { onDelete: "cascade" }),
+  occurredAt: timestamp("occurred_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  channel: text("channel").notNull().default("email"),
+  summary: text("summary").notNull().default(""),
+  authorName: text("author_name").notNull().default(""),
+  ...timestamps,
+});
+
+/**
+ * Ideas & R&D — additive innovation pipeline.
+ * Status: submitted | under_review | approved | in_rd | rejected | parked
+ * R&D stage: backlog | researching | prototyping | validating | completed | shelved
+ */
+export const ideas = pgTable(
+  "ideas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    problem: text("problem").notNull().default(""),
+    potentialValue: text("potential_value").notNull().default(""),
+    potentialValueZar: numeric("potential_value_zar", {
+      precision: 14,
+      scale: 2,
+    }),
+    category: text("category").notNull().default("Other"),
+    status: text("status").notNull().default("submitted"),
+    submitterUserId: text("submitter_user_id").notNull(),
+    submitterName: text("submitter_name").notNull().default(""),
+    reviewerUserId: text("reviewer_user_id"),
+    reviewerName: text("reviewer_name").notNull().default(""),
+    channelId: text("channel_id"),
+    decisionReason: text("decision_reason").notNull().default(""),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedByUserId: text("decided_by_user_id"),
+    decidedByName: text("decided_by_name").notNull().default(""),
+    rdItemId: text("rd_item_id"),
+    ...timestamps,
+  },
+  (t) => [
+    index("ideas_status_idx").on(t.status),
+    index("ideas_category_idx").on(t.category),
+    index("ideas_submitter_idx").on(t.submitterUserId),
+  ],
+);
+
+export const ideaReviews = pgTable(
+  "idea_reviews",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull().default(""),
+    comment: text("comment").notNull().default(""),
+    score: integer("score"),
+    ...timestamps,
+  },
+  (t) => [index("idea_reviews_idea_id_idx").on(t.ideaId)],
+);
+
+export const ideaAttachments = pgTable(
+  "idea_attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull().default("application/octet-stream"),
+    size: integer("size").notNull().default(0),
+    storedName: text("stored_name").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("idea_attachments_idea_id_idx").on(t.ideaId)],
+);
+
+export const rdItems = pgTable(
+  "rd_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ideaId: uuid("idea_id")
+      .notNull()
+      .references(() => ideas.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    stage: text("stage").notNull().default("backlog"),
+    ownerUserId: text("owner_user_id"),
+    ownerName: text("owner_name").notNull().default(""),
+    priority: text("priority").notNull().default("medium"),
+    targetDate: timestamp("target_date", { withTimezone: true }),
+    effortNotes: text("effort_notes").notNull().default(""),
+    progressNotes: text("progress_notes").notNull().default(""),
+    atRisk: boolean("at_risk").notNull().default(false),
+    submitterName: text("submitter_name").notNull().default(""),
+    approvedByName: text("approved_by_name").notNull().default(""),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    index("rd_items_stage_idx").on(t.stage),
+    index("rd_items_idea_id_idx").on(t.ideaId),
+    index("rd_items_owner_idx").on(t.ownerUserId),
+  ],
+);
+
+export const rdAssignments = pgTable(
+  "rd_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    rdItemId: uuid("rd_item_id")
+      .notNull()
+      .references(() => rdItems.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull().default(""),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("rd_assignments_rd_user_uidx").on(t.rdItemId, t.userId),
+    index("rd_assignments_user_idx").on(t.userId),
+  ],
+);
+
+export const rdActivity = pgTable(
+  "rd_activity",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    rdItemId: uuid("rd_item_id")
+      .notNull()
+      .references(() => rdItems.id, { onDelete: "cascade" }),
+    authorUserId: text("author_user_id").notNull().default(""),
+    authorName: text("author_name").notNull().default(""),
+    body: text("body").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("rd_activity_rd_item_id_idx").on(t.rdItemId)],
+);
+
+export const rdDocuments = pgTable(
+  "rd_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    rdItemId: uuid("rd_item_id")
+      .notNull()
+      .references(() => rdItems.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull().default("application/octet-stream"),
+    size: integer("size").notNull().default(0),
+    storedName: text("stored_name").notNull(),
+    ...timestamps,
+  },
+  (t) => [index("rd_documents_rd_item_id_idx").on(t.rdItemId)],
 );

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { createLead, listLeads } from "@/lib/leads/store";
 import {
   LEAD_LANES,
@@ -10,11 +11,16 @@ import {
 } from "@/lib/leads/types";
 
 export async function GET() {
+  const auth = await requirePermission("leads", "view");
+  if (!auth.ok) return auth.response;
   const leads = await listLeads();
   return NextResponse.json({ leads });
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("leads", "create");
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();

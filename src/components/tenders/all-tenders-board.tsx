@@ -288,11 +288,7 @@ export function AllTendersBoard() {
               key={value}
               type="button"
               onClick={() => applyDraft({ type: value })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                draft.type === value
-                  ? "bg-navy text-white"
-                  : "bg-mist text-muted hover:text-ink"
-              }`}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${draft.type === value ? "bg-navy text-white" : "bg-mist text-muted hover:text-ink"}`}
             >
               {label}
             </button>
@@ -326,7 +322,7 @@ export function AllTendersBoard() {
           <button
             type="submit"
             disabled={pending || runningIntake}
-            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+            className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
           >
             {pending && activeScope === "beyond_defaults"
               ? "Searching…"
@@ -336,11 +332,7 @@ export function AllTendersBoard() {
             type="button"
             onClick={browseDefaults}
             disabled={pending && activeScope === "defaults"}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${
-              activeScope === "defaults"
-                ? "bg-navy text-white"
-                : "border border-navy/10 bg-white text-navy"
-            }`}
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${activeScope === "defaults" ? "bg-navy text-white" : "border border-navy/10 bg-white text-navy"}`}
           >
             {pending && activeScope === "defaults"
               ? "Loading defaults…"
@@ -356,11 +348,7 @@ export function AllTendersBoard() {
           </button>
           <span className="font-mono text-xs text-muted">
             {result
-              ? `${result.total} result${result.total === 1 ? "" : "s"} · ${
-                  activeScope === "defaults"
-                    ? "our defaults"
-                    : "outside defaults"
-                }`
+              ? `${result.total} result${result.total === 1 ? "" : "s"} · ${activeScope === "defaults" ? "our defaults" : "outside defaults"}`
               : null}
           </span>
         </div>
@@ -476,22 +464,18 @@ export function AllTendersBoard() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-md bg-mint/15 px-2 py-1 text-[0.65rem] font-semibold text-navy">
+                      <span className="rounded-md bg-mint/15 px-2 py-1 text-[0.65rem] font-semibold text-ink">
                         {typeLabel}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div
-                        className={`font-mono text-xs font-semibold ${
-                          atRisk ? "text-coral" : "text-ink"
-                        }`}
+                        className={`font-mono text-xs font-semibold ${atRisk ? "text-coral" : "text-ink"}`}
                       >
                         {formatZaClosing(item.closingAt)}
                       </div>
                       <div
-                        className={`mt-0.5 text-xs ${
-                          atRisk ? "font-semibold text-coral" : "text-muted"
-                        }`}
+                        className={`mt-0.5 text-xs ${atRisk ? "font-semibold text-coral" : "text-muted"}`}
                       >
                         {days} working {days === 1 ? "day" : "days"}
                       </div>

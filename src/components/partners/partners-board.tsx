@@ -126,7 +126,7 @@ export function PartnersBoard() {
             setOpen((v) => !v);
             setError(null);
           }}
-          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
         >
           {open ? "Cancel" : "Add partner"}
         </button>
@@ -145,11 +145,7 @@ export function PartnersBoard() {
             key={value}
             type="button"
             onClick={() => setFilter(value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              filter === value
-                ? "bg-navy text-white"
-                : "bg-white text-muted ring-1 ring-navy/10"
-            }`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === value ? "bg-navy text-white" : "bg-white text-muted ring-1 ring-navy/10"}`}
           >
             {label}
           </button>
@@ -339,7 +335,7 @@ export function PartnersBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
             >
               {pending ? "Saving…" : "Save partner"}
             </button>
@@ -362,7 +358,7 @@ export function PartnersBoard() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap gap-2">
-                    <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                    <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                       {kindLabel[partner.kind]}
                     </span>
                     <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-muted">

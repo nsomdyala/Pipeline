@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { ensureSeedAdmin, listAuthUsers } from "@/lib/auth/users";
+import { requirePermission, requireSession } from "@/lib/auth/require-permission";
+import { ensureSeedAdmin, listAuthUsers, mapManagedUser } from "@/lib/auth/users";
+import { ensurePermissionsSeeded } from "@/lib/permissions/store";
 import { getSettings, saveCompany } from "@/lib/settings/store";
 import type { CompanyProfile } from "@/lib/settings/types";
 
@@ -10,16 +12,11 @@ async function settingsWithDbUsers() {
   }
   try {
     await ensureSeedAdmin();
+    await ensurePermissionsSeeded();
     const rows = await listAuthUsers();
     return {
       ...settings,
-      users: rows.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role as "admin" | "member" | "viewer",
-        avatarUrl: u.avatarUrl ?? null,
-      })),
+      users: rows.map(mapManagedUser),
     };
   } catch (err) {
     console.error("Could not load users from Postgres", err);
@@ -28,10 +25,12 @@ async function settingsWithDbUsers() {
 }
 
 export async function GET() {
+  const auth = await requireSession();
+  if (!auth.ok) return auth.response;
+
   try {
     return NextResponse.json(await settingsWithDbUsers());
   } catch (err) {
-    // Company settings may still be file-backed; surface a clear error on Vercel.
     return NextResponse.json(
       {
         error:
@@ -43,6 +42,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const auth = await requirePermission("settings", "edit");
+  if (!auth.ok) return auth.response;
+
   const body = (await request.json()) as { company?: CompanyProfile };
   if (!body.company?.name?.trim()) {
     return NextResponse.json(
@@ -56,13 +58,7 @@ export async function PUT(request: Request) {
       const rows = await listAuthUsers();
       return NextResponse.json({
         ...settings,
-        users: rows.map((u) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role as "admin" | "member" | "viewer",
-          avatarUrl: u.avatarUrl ?? null,
-        })),
+        users: rows.map(mapManagedUser),
       });
     } catch {
       // fall through

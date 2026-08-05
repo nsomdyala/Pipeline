@@ -177,11 +177,7 @@ export function ChatPanel() {
                     <button
                       type="button"
                       onClick={() => setActiveId(channel.id)}
-                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                        selected
-                          ? "bg-mint/15 font-semibold text-navy"
-                          : "text-ink/80 hover:bg-mist"
-                      }`}
+                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${selected ? "bg-mint/15 font-semibold text-ink" : "text-ink/80 hover:bg-mist"}`}
                     >
                       <span className="font-mono text-muted">#</span>
                       <span className="truncate">{channel.name}</span>
@@ -206,7 +202,7 @@ export function ChatPanel() {
               <button
                 type="submit"
                 disabled={pending || !newChannel.trim()}
-                className="rounded-lg bg-mint px-2.5 py-2 text-xs font-semibold text-navy disabled:opacity-50"
+                className="rounded-lg bg-mint px-2.5 py-2 text-xs font-semibold disabled:opacity-50 text-white"
               >
                 Add
               </button>
@@ -285,7 +281,7 @@ export function ChatPanel() {
                 <button
                   type="submit"
                   disabled={pending || !draft.trim()}
-                  className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-50"
+                  className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-50 text-white"
                 >
                   Send
                 </button>

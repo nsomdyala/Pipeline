@@ -10,8 +10,6 @@ import {
   workingDaysUntil,
 } from "@/lib/opportunities/dates";
 import type { Opportunity } from "@/lib/opportunities/types";
-import type { UserRole } from "@/lib/settings/types";
-
 export type WorkspaceView = "mine" | "team";
 
 const STORAGE_KEY = "pipeline.workspaceView";
@@ -26,7 +24,7 @@ const OPEN_STAGES = new Set([
 
 type Props = {
   userName: string;
-  role: UserRole;
+  role: string;
 };
 
 export function WorkspaceDashboard({ userName, role }: Props) {
@@ -158,11 +156,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
             role="tab"
             aria-selected={view === "mine"}
             onClick={() => switchView("mine")}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              view === "mine"
-                ? "bg-mint text-navy"
-                : "text-muted hover:text-ink"
-            }`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${view === "mine" ? "bg-mint text-white" : "text-muted hover:text-ink"}`}
           >
             My work
           </button>
@@ -177,11 +171,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
                 : "Team workspace requires a bid team or admin role"
             }
             onClick={() => switchView("team")}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-              view === "team"
-                ? "bg-mint text-navy"
-                : "text-muted hover:text-ink"
-            }`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${view === "team" ? "bg-mint text-white" : "text-muted hover:text-ink"}`}
           >
             Team
           </button>
@@ -196,9 +186,7 @@ export function WorkspaceDashboard({ userName, role }: Props) {
           >
             <div className="label-mono">{stat.label}</div>
             <div
-              className={`mt-2 font-mono text-2xl font-semibold tracking-tight ${
-                stat.coral ? "text-coral" : "text-ink"
-              }`}
+              className={`mt-2 font-mono text-2xl font-semibold tracking-tight ${stat.coral ? "text-coral" : "text-ink"}`}
             >
               {loading ? "…" : stat.value}
             </div>
@@ -294,16 +282,12 @@ export function WorkspaceDashboard({ userName, role }: Props) {
                     <div className="shrink-0 text-left md:text-right">
                       <div className="label-mono">Closing</div>
                       <div
-                        className={`mt-1 font-mono text-sm font-semibold ${
-                          atRiskItem ? "text-coral" : "text-ink"
-                        }`}
+                        className={`mt-1 font-mono text-sm font-semibold ${atRiskItem ? "text-coral" : "text-ink"}`}
                       >
                         {formatZaClosing(card.closingAt)}
                       </div>
                       <div
-                        className={`mt-0.5 text-xs font-semibold ${
-                          atRiskItem ? "text-coral" : "text-muted"
-                        }`}
+                        className={`mt-0.5 text-xs font-semibold ${atRiskItem ? "text-coral" : "text-muted"}`}
                       >
                         {daysLeft} working{" "}
                         {daysLeft === 1 ? "day" : "days"} left

@@ -14,7 +14,7 @@ import type {
   CreateMessageInput,
 } from "@/lib/chat/types";
 
-const CHANNEL_KINDS = ["public", "dm", "opportunity"] as const;
+const CHANNEL_KINDS = ["public", "dm", "opportunity", "idea"] as const;
 
 const DEFAULT_CHANNELS: Array<{
   name: string;

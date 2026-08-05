@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { createAccount, listAccounts } from "@/lib/accounts/store";
 import {
   ACCOUNT_LANES,
@@ -10,11 +11,16 @@ import {
 } from "@/lib/accounts/types";
 
 export async function GET() {
+  const auth = await requirePermission("accounts", "view");
+  if (!auth.ok) return auth.response;
   const accounts = await listAccounts();
   return NextResponse.json({ accounts });
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("accounts", "create");
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();

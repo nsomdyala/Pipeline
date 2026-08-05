@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { requirePermission, requireSession } from "@/lib/auth/require-permission";
 import { OPP_LANES } from "@/lib/opportunities/types";
 import { getSettings, saveCategoryConfig } from "@/lib/settings/store";
 import type { SettingsBundle } from "@/lib/settings/types";
 
 export async function GET() {
+  const auth = await requireSession();
+  if (!auth.ok) return auth.response;
   const settings = await getSettings();
   return NextResponse.json({
     categoryLaneMap: settings.categoryLaneMap,
@@ -12,6 +15,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const auth = await requirePermission("settings", "edit");
+  if (!auth.ok) return auth.response;
+
   const body = (await request.json()) as {
     categoryLaneMap?: SettingsBundle["categoryLaneMap"];
     defaultEtendersCategories?: string[];

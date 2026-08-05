@@ -88,7 +88,7 @@ export function ProposalsBoard() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+          className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
         >
           {open ? "Cancel" : "New proposal"}
         </button>
@@ -153,7 +153,7 @@ export function ProposalsBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
             >
               Create draft
             </button>
@@ -173,7 +173,7 @@ export function ProposalsBoard() {
                   {proposal.opportunityRef}
                 </span>
               ) : null}
-              <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+              <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                 {statusLabel[proposal.status]}
               </span>
             </div>

@@ -30,8 +30,11 @@ function formatTime(iso: string) {
   }).format(date);
 }
 
-export function openLiveChat() {
-  window.dispatchEvent(new Event(OPEN_EVENT));
+/** Open the Live Chat rail; optionally focus a channel (e.g. idea discussion). */
+export function openLiveChat(channelId?: string) {
+  window.dispatchEvent(
+    new CustomEvent(OPEN_EVENT, { detail: { channelId } }),
+  );
 }
 
 export function LiveChatRail({
@@ -76,12 +79,16 @@ export function LiveChatRail({
   }, []);
 
   useEffect(() => {
-    function onOpen() {
+    function onOpen(event: Event) {
       setOpen(true);
       try {
         localStorage.setItem(STORAGE_KEY, "1");
       } catch {
         /* ignore */
+      }
+      const detail = (event as CustomEvent<{ channelId?: string }>).detail;
+      if (detail?.channelId) {
+        setActiveId(detail.channelId);
       }
     }
     window.addEventListener(OPEN_EVENT, onOpen);
@@ -267,9 +274,7 @@ export function LiveChatRail({
           title="Open live chat"
         >
           <span
-            className={`mt-1 size-2 rounded-full ${
-              livePulse ? "bg-mint shadow-[0_0_0_4px_rgba(31,199,156,0.25)]" : "bg-mint"
-            }`}
+            className={`mt-1 size-2 rounded-full ${livePulse ? "bg-mint shadow-[0_0_0_4px_rgba(168,101,44,0.28)]" : "bg-mint"}`}
           />
           <span
             className="label-mono text-[0.625rem] text-inherit"
@@ -284,9 +289,7 @@ export function LiveChatRail({
 
   return (
     <aside
-      className={`live-chat-rail relative z-20 flex h-full w-[min(22rem,100vw)] shrink-0 flex-col border-l border-navy/8 bg-white ${
-        livePulse ? "live-chat-pulse" : ""
-      }`}
+      className={`live-chat-rail relative z-20 flex h-full w-[min(22rem,100vw)] shrink-0 flex-col border-l border-navy/8 bg-white ${livePulse ? "live-chat-pulse" : ""}`}
       aria-label="Live team chat"
     >
       <header className="flex items-start justify-between gap-2 border-b border-navy/8 px-4 py-3">
@@ -325,11 +328,7 @@ export function LiveChatRail({
                 key={channel.id}
                 type="button"
                 onClick={() => setActiveId(channel.id)}
-                className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs transition ${
-                  selected
-                    ? "bg-mint/15 font-semibold text-navy"
-                    : "text-muted hover:bg-mist hover:text-ink"
-                }`}
+                className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs transition ${selected ? "bg-mint/15 font-semibold text-ink" : "text-muted hover:bg-mist hover:text-ink"}`}
               >
                 <span className="font-mono">#</span>
                 {channel.name}

@@ -150,7 +150,7 @@ export function LeadsBoard() {
             setOpen((value) => !value);
             setError(null);
           }}
-          className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy transition-opacity hover:opacity-90"
+          className="inline-flex items-center justify-center rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 text-white"
         >
           {open ? "Cancel" : "Add lead"}
         </button>
@@ -302,7 +302,7 @@ export function LeadsBoard() {
             <button
               type="submit"
               disabled={pending}
-              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+              className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold disabled:opacity-60 text-white"
             >
               {pending ? "Saving…" : "Save lead"}
             </button>
@@ -354,11 +354,11 @@ export function LeadsBoard() {
                         {sourceLabels[lead.source]}
                       </span>
                       {lead.submissionKind ? (
-                        <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-navy">
+                        <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold capitalize text-ink">
                           {lead.submissionKind}
                         </span>
                       ) : null}
-                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                         {lead.status}
                       </span>
                       <span className="rounded-md bg-mist px-2 py-0.5 text-[0.65rem] font-semibold text-muted">
@@ -413,7 +413,7 @@ export function LeadsBoard() {
                         type="button"
                         onClick={() => appoint(lead.id)}
                         disabled={appointingId === lead.id || pending}
-                        className="mt-3 rounded-xl bg-mint px-3 py-2 text-xs font-semibold text-navy disabled:opacity-60"
+                        className="mt-3 rounded-xl bg-mint px-3 py-2 text-xs font-semibold disabled:opacity-60 text-white"
                       >
                         {appointingId === lead.id
                           ? "Appointing…"

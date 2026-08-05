@@ -4,7 +4,7 @@ type PipelineMarkProps = {
   animated?: boolean;
 };
 
-/** Inverse mark (mint tile) with optional advancing-bar motion. */
+/** Clay Bureau mark — ink disc with terracotta live bar. */
 export function PipelineMark({
   size = 48,
   className = "",
@@ -19,35 +19,15 @@ export function PipelineMark({
       className={className}
       aria-hidden
     >
-      <rect width="48" height="48" rx="13" fill="#1FC79C" />
+      <circle cx="24" cy="24" r="24" fill="#2A2E22" />
       <rect
         className={animated ? "mark-bar mark-bar-1" : undefined}
-        x="11"
-        y="13"
-        width="13"
-        height="5"
-        rx="2.5"
-        fill="#06231a"
-        opacity="0.35"
-      />
-      <rect
-        className={animated ? "mark-bar mark-bar-2" : undefined}
-        x="11"
+        x="14"
         y="21.5"
-        width="19"
+        width="20"
         height="5"
         rx="2.5"
-        fill="#06231a"
-        opacity="0.65"
-      />
-      <rect
-        className={animated ? "mark-bar mark-bar-3" : undefined}
-        x="11"
-        y="30"
-        width="26"
-        height="5"
-        rx="2.5"
-        fill="#06231a"
+        fill="#A8652C"
       />
     </svg>
   );

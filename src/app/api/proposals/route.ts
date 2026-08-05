@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/require-permission";
 import { createProposal, listProposals } from "@/lib/proposals/store";
 import {
   PROPOSAL_STATUSES,
@@ -6,10 +7,15 @@ import {
 } from "@/lib/proposals/types";
 
 export async function GET() {
+  const auth = await requirePermission("proposals", "view");
+  if (!auth.ok) return auth.response;
   return NextResponse.json({ proposals: await listProposals() });
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("proposals", "create");
+  if (!auth.ok) return auth.response;
+
   const body = (await request.json()) as {
     title?: string;
     client?: string;

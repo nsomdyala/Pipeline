@@ -1,4 +1,5 @@
-export type ChannelKind = "public" | "dm" | "opportunity";
+/** Additive kinds: `idea` links an idea register thread to Live Chat. */
+export type ChannelKind = "public" | "dm" | "opportunity" | "idea";
 
 export type Channel = {
   id: string;

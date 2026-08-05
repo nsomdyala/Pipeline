@@ -3,6 +3,7 @@ import {
   SESSION_COOKIE,
   encodeSession,
   getSession,
+  type SessionUser,
 } from "@/lib/auth/session";
 import { setUserAvatarUrl } from "@/lib/auth/users";
 import { processAvatarUpload } from "@/lib/avatars/process";
@@ -13,13 +14,7 @@ import {
 
 function withSessionCookie(
   body: unknown,
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: "admin" | "member" | "viewer";
-    avatarUrl?: string | null;
-  },
+  user: SessionUser,
   init?: ResponseInit,
 ) {
   const response = NextResponse.json(body, init);

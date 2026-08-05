@@ -6,11 +6,13 @@ import {
   defaultEtendersCategories,
 } from "@/lib/intake/config/etenders-categories";
 import { readJsonFile, writeJsonFile } from "@/lib/json-store";
-import type {
-  AppUser,
-  CompanyProfile,
-  SettingsBundle,
-  UserRole,
+import { COMPANY_DEFAULTS } from "@/lib/company/content";
+import {
+  withCompanyDefaults,
+  type AppUser,
+  type CompanyProfile,
+  type SettingsBundle,
+  type UserRole,
 } from "@/lib/settings/types";
 
 export type {
@@ -20,24 +22,13 @@ export type {
   SettingsBundle,
   UserRole,
 } from "@/lib/settings/types";
-export { USER_ROLES } from "@/lib/settings/types";
+export { USER_ROLES, withCompanyDefaults } from "@/lib/settings/types";
 
 const FILE = "settings.json";
 
 function seed(): SettingsBundle {
   return {
-    company: {
-      name: "Max Attention Technologies",
-      tradingAs: "Pipeline / Aura Workstream",
-      regNo: "2020/123456/07",
-      csdNo: "MAAA0123456",
-      vatNo: "4123456789",
-      taxPin: "••••••••",
-      bbbeeLevel: "Level 1 EME",
-      address: "The Innovation Hub, Pretoria, Gauteng",
-      email: "nsomdyala@maxattention.tech",
-      phone: "+27 12 000 0000",
-    },
+    company: withCompanyDefaults({ ...COMPANY_DEFAULTS }),
     users: [
       {
         id: "user-admin",
@@ -115,9 +106,58 @@ function seed(): SettingsBundle {
   };
 }
 
+function migrateCompanyProfile(company: CompanyProfile): CompanyProfile {
+  const base = withCompanyDefaults(company);
+  const looksPlaceholder =
+    !base.regNo ||
+    base.regNo === "2020/123456/07" ||
+    base.address.includes("Innovation Hub") ||
+    base.email === "nsomdyala@maxattention.tech";
+
+  if (looksPlaceholder) {
+    return withCompanyDefaults({
+      ...COMPANY_DEFAULTS,
+      // Keep only non-placeholder credential overrides
+      csdNo:
+        base.csdNo && !base.csdNo.startsWith("MAAA0")
+          ? base.csdNo
+          : COMPANY_DEFAULTS.csdNo,
+      vatNo:
+        base.vatNo && base.vatNo !== "4123456789"
+          ? base.vatNo
+          : COMPANY_DEFAULTS.vatNo,
+      taxPin:
+        base.taxPin && base.taxPin !== "••••••••"
+          ? base.taxPin
+          : COMPANY_DEFAULTS.taxPin,
+      bbbeeLevel:
+        base.bbbeeLevel && base.bbbeeLevel !== "Level 1 EME"
+          ? base.bbbeeLevel
+          : COMPANY_DEFAULTS.bbbeeLevel,
+      bankDetails: {
+        ...COMPANY_DEFAULTS.bankDetails,
+        bankName: base.bankDetails.bankName || "",
+        accountNumber: base.bankDetails.accountNumber || "",
+        branchCode: base.bankDetails.branchCode || "",
+      },
+    });
+  }
+
+  return withCompanyDefaults({
+    ...base,
+    about: base.about || COMPANY_DEFAULTS.about,
+    vision: base.vision || COMPANY_DEFAULTS.vision,
+    mission: base.mission || COMPANY_DEFAULTS.mission,
+    tagline: base.tagline || COMPANY_DEFAULTS.tagline,
+    website: base.website || COMPANY_DEFAULTS.website,
+    directors: base.directors || COMPANY_DEFAULTS.directors,
+  });
+}
+
 function withSettingsDefaults(bundle: SettingsBundle): SettingsBundle {
   return {
     ...bundle,
+    company: migrateCompanyProfile(bundle.company),
     categoryLaneMap:
       bundle.categoryLaneMap?.length > 0
         ? bundle.categoryLaneMap
@@ -133,7 +173,10 @@ export async function getSettings() {
   const existing = await readJsonFile<SettingsBundle | null>(FILE, null);
   if (existing) {
     const migrated = withSettingsDefaults(existing);
+    const companyChanged =
+      JSON.stringify(existing.company) !== JSON.stringify(migrated.company);
     if (
+      companyChanged ||
       !existing.categoryLaneMap?.length ||
       !existing.defaultEtendersCategories?.length
     ) {
@@ -148,7 +191,7 @@ export async function getSettings() {
 
 export async function saveCompany(company: CompanyProfile) {
   const settings = await getSettings();
-  settings.company = company;
+  settings.company = withCompanyDefaults(company);
   await writeJsonFile(FILE, settings);
   return settings;
 }

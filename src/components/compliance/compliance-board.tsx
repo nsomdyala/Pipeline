@@ -73,7 +73,7 @@ export function ComplianceBoard() {
         </div>
         <a
           href="/api/compliance/bid-pack"
-          className="inline-flex rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy"
+          className="inline-flex rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-white"
         >
           Download bid pack
         </a>
@@ -102,7 +102,7 @@ export function ComplianceBoard() {
                 <span
                   className={`rounded-md px-2 py-0.5 text-[0.65rem] font-semibold ${
                     row.status === "valid"
-                      ? "bg-mint/15 text-navy"
+                      ? "bg-mint/15 text-ink"
                       : atRisk
                         ? "bg-coral/15 text-coral"
                         : "bg-mist text-muted"

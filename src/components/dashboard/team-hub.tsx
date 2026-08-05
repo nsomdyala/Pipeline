@@ -206,9 +206,7 @@ export function TeamHub({ userName }: { userName: string }) {
                 </span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-mist">
                   <div
-                    className={`h-full rounded-full ${
-                      row.stage === "Submitted" ? "bg-mint" : "bg-navy/70"
-                    }`}
+                    className={`h-full rounded-full ${row.stage === "Submitted" ? "bg-mint" : "bg-navy/70"}`}
                     style={{
                       width: `${Math.max(row.count ? 8 : 0, (row.count / maxStage) * 100)}%`,
                     }}
@@ -278,7 +276,7 @@ export function TeamHub({ userName }: { userName: string }) {
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-navy">
+                      <span className="rounded-md bg-mint/15 px-2 py-0.5 text-[0.65rem] font-semibold text-ink">
                         {lead.accountId ? "Appointed" : "Submitted"}
                       </span>
                       {lead.refNo ? (
@@ -318,9 +316,9 @@ export function TeamHub({ userName }: { userName: string }) {
       </section>
 
       <section className="mb-8 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl bg-navy p-5 text-white shadow-sm">
+        <div className="rounded-2xl bg-ink p-5 text-white shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Partner letters</h2>
+            <h2 className="text-lg font-semibold text-white">Partner letters</h2>
             <Link
               href="/partners"
               className="text-xs font-semibold text-mint hover:underline"
@@ -346,9 +344,7 @@ export function TeamHub({ userName }: { userName: string }) {
                     </div>
                   </div>
                   <span
-                    className={`text-xs font-semibold ${
-                      expiring ? "text-coral" : "text-mint"
-                    }`}
+                    className={`text-xs font-semibold ${expiring ? "text-coral" : "text-mint"}`}
                   >
                     {p.letterExpiresAt
                       ? expiring
