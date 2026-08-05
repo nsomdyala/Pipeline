@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { opportunities as opportunitiesTable } from "@/db/schema";
 import { buildSearchText } from "@/lib/opportunities/search-text";
@@ -126,11 +126,11 @@ function toInsertValues(input: CreateOpportunityInput, files: OpportunityFile[] 
     contactName: input.contactName ?? null,
     contactEmail: input.contactEmail ?? null,
     contactPhone: input.contactPhone ?? null,
-    inPipeline: Boolean(
-      input.inPipeline ??
-        (input.source === "Manual" ||
-          (!(input.lowRelevance ?? false) && input.lane !== "Other")),
-    ),
+    // Intake / eTenders stay off the Opportunities board until explicitly promoted.
+    inPipeline:
+      input.inPipeline !== undefined
+        ? Boolean(input.inPipeline)
+        : input.source === "Manual",
     searchText,
   };
 }
@@ -171,6 +171,45 @@ export async function pgFindByExternalId(
     .where(eq(opportunitiesTable.externalId, externalId))
     .limit(1);
   return rows[0] ? rowToOpportunity(rows[0]) : null;
+}
+
+export async function pgFindByExternalIds(
+  externalIds: string[],
+): Promise<Map<string, Opportunity>> {
+  const unique = [...new Set(externalIds.map((id) => id.trim()).filter(Boolean))];
+  const map = new Map<string, Opportunity>();
+  if (unique.length === 0) return map;
+
+  // Chunk to keep IN lists reasonable for the pooler.
+  const CHUNK = 200;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const rows = await db
+      .select()
+      .from(opportunitiesTable)
+      .where(inArray(opportunitiesTable.externalId, chunk));
+    for (const row of rows) {
+      if (row.externalId) map.set(row.externalId, rowToOpportunity(row));
+    }
+  }
+  return map;
+}
+
+export async function pgCreateOpportunities(
+  inputs: CreateOpportunityInput[],
+): Promise<Opportunity[]> {
+  if (inputs.length === 0) return [];
+  const CHUNK = 50;
+  const created: Opportunity[] = [];
+  for (let i = 0; i < inputs.length; i += CHUNK) {
+    const chunk = inputs.slice(i, i + CHUNK);
+    const rows = await db
+      .insert(opportunitiesTable)
+      .values(chunk.map((input) => toInsertValues(input)))
+      .returning();
+    created.push(...rows.map(rowToOpportunity));
+  }
+  return created;
 }
 
 export async function pgCreateOpportunity(

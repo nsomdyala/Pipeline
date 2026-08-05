@@ -43,6 +43,8 @@ export function AllTendersBoard() {
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [runningIntake, setRunningIntake] = useState(false);
+  const [intakeSummary, setIntakeSummary] = useState<string | null>(null);
 
   const load = useCallback((next: Filters) => {
     setLoading(true);
@@ -92,6 +94,63 @@ export function AllTendersBoard() {
     setDraft(initial);
     load(initial);
   }, [load]);
+
+  function runIntakeNow() {
+    setRunningIntake(true);
+    setError(null);
+    setIntakeSummary(null);
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/intake/etenders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const data = (await res.json()) as {
+          error?: string;
+          summary?: string;
+          result?: {
+            fetched: number;
+            created: number;
+            amended: number;
+            unchanged: number;
+            status: string;
+            dateFrom: string;
+            dateTo: string;
+            errors?: string[];
+          };
+        };
+        if (!res.ok) {
+          throw new Error(data.error ?? "Intake failed.");
+        }
+        const r = data.result;
+        setIntakeSummary(
+          data.summary ??
+            (r
+              ? `Fetched ${r.fetched}, created ${r.created}, updated ${r.amended}.`
+              : "Intake finished."),
+        );
+        if (r) {
+          setNotice(
+            `eTenders ${r.status}: ${r.dateFrom} → ${r.dateTo}. ${data.summary ?? ""}`,
+          );
+        }
+        const next = filters ?? {
+          q: "",
+          type: "all" as const,
+          buyer: "",
+          includeClosed: false,
+          scope: "defaults" as const,
+          page: 1,
+        };
+        load({ ...next, page: 1, scope: "defaults" });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Intake failed.");
+      } finally {
+        setRunningIntake(false);
+      }
+    });
+  }
 
   function browseDefaults() {
     const next: Filters = {
@@ -266,7 +325,7 @@ export function AllTendersBoard() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || runningIntake}
             className="rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
           >
             {pending && activeScope === "beyond_defaults"
@@ -287,6 +346,14 @@ export function AllTendersBoard() {
               ? "Loading defaults…"
               : "Show our defaults"}
           </button>
+          <button
+            type="button"
+            onClick={runIntakeNow}
+            disabled={runningIntake || pending}
+            className="rounded-xl border border-navy/10 bg-white px-4 py-2.5 text-sm font-semibold text-navy disabled:opacity-60"
+          >
+            {runningIntake ? "Running intake…" : "Run intake now"}
+          </button>
           <span className="font-mono text-xs text-muted">
             {result
               ? `${result.total} result${result.total === 1 ? "" : "s"} · ${
@@ -302,6 +369,11 @@ export function AllTendersBoard() {
       {error ? (
         <p className="mb-3 text-sm font-semibold text-coral" role="alert">
           {error}
+        </p>
+      ) : null}
+      {intakeSummary && !error ? (
+        <p className="mb-3 text-sm font-semibold text-mint" role="status">
+          {intakeSummary}
         </p>
       ) : null}
       {notice && !error ? (
@@ -334,9 +406,27 @@ export function AllTendersBoard() {
               {result && result.items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted">
-                    {activeScope === "defaults"
-                      ? "No default-category tenders yet. Wait for auto-pull, or run eTenders from Opportunities."
-                      : "No RFQs / tenders / RFPs outside our defaults match this search. Try clearing the type filter or include closed."}
+                    {activeScope === "defaults" ? (
+                      <div className="mx-auto max-w-md space-y-3">
+                        <p className="font-semibold text-ink">
+                          No default-category tenders in the database yet
+                        </p>
+                        <p className="text-sm">
+                          Run eTenders intake to pull our default categories
+                          (ICT, telecoms, electrical) across all provinces.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={runIntakeNow}
+                          disabled={runningIntake}
+                          className="rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                        >
+                          {runningIntake ? "Running intake…" : "Run intake now"}
+                        </button>
+                      </div>
+                    ) : (
+                      "No RFQs / tenders / RFPs outside our defaults match this search. Try clearing the type filter or include closed."
+                    )}
                   </td>
                 </tr>
               ) : null}

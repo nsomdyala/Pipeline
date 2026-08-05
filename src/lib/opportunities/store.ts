@@ -195,6 +195,26 @@ export async function findByExternalId(
   return found ? withOpportunityDefaults(found) : null;
 }
 
+export async function findByExternalIds(
+  externalIds: string[],
+): Promise<Map<string, Opportunity>> {
+  if (usePostgres()) {
+    const { pgFindByExternalIds } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgFindByExternalIds(externalIds);
+  }
+  const items = await ensureStore();
+  const map = new Map<string, Opportunity>();
+  const wanted = new Set(externalIds);
+  for (const item of items) {
+    if (item.externalId && wanted.has(item.externalId)) {
+      map.set(item.externalId, withOpportunityDefaults(item));
+    }
+  }
+  return map;
+}
+
 export async function createOpportunity(
   input: CreateOpportunityInput,
   files: OpportunityFile[] = [],
@@ -246,9 +266,9 @@ export async function createOpportunity(
     contactEmail: input.contactEmail ?? null,
     contactPhone: input.contactPhone ?? null,
     inPipeline:
-      input.inPipeline ??
-      (input.source === "Manual" ||
-        (!(input.lowRelevance ?? false) && input.lane !== "Other")),
+      input.inPipeline !== undefined
+        ? Boolean(input.inPipeline)
+        : input.source === "Manual",
     searchText: buildSearchText({
       title: input.title.trim(),
       description: input.description?.trim() ?? "",
@@ -278,14 +298,11 @@ type IntakeUpsertFields = {
   panelTerm: string | null;
 };
 
-export async function createOpportunityFromIntake(
+function intakeFieldsToCreateInput(
   fields: IntakeUpsertFields,
-): Promise<Opportunity> {
+): CreateOpportunityInput {
   const { normalised: n } = fields;
-  // Intake stores every release for All Tenders. Opportunities only after
-  // an explicit "Move to Opportunities" action (or manual add).
-  const inPipeline = false;
-  return createOpportunity({
+  return {
     refNo: n.refNo,
     title: n.title,
     description: n.description,
@@ -317,8 +334,35 @@ export async function createOpportunityFromIntake(
     contactName: n.contact?.name ?? null,
     contactEmail: n.contact?.email ?? null,
     contactPhone: n.contact?.telephone ?? null,
-    inPipeline,
-  });
+    // Intake stores every release for All Tenders. Opportunities only after
+    // an explicit "Move to Opportunities" action (or manual add).
+    inPipeline: false,
+  };
+}
+
+export async function createOpportunityFromIntake(
+  fields: IntakeUpsertFields,
+): Promise<Opportunity> {
+  return createOpportunity(intakeFieldsToCreateInput(fields));
+}
+
+/** Batch-create intake rows (Postgres). Falls back to sequential for JSON store. */
+export async function createOpportunitiesFromIntake(
+  fieldsList: IntakeUpsertFields[],
+): Promise<Opportunity[]> {
+  if (fieldsList.length === 0) return [];
+  const inputs = fieldsList.map(intakeFieldsToCreateInput);
+  if (usePostgres()) {
+    const { pgCreateOpportunities } = await import(
+      "@/lib/opportunities/pg-store"
+    );
+    return pgCreateOpportunities(inputs);
+  }
+  const created: Opportunity[] = [];
+  for (const input of inputs) {
+    created.push(await createOpportunity(input));
+  }
+  return created;
 }
 
 export async function updateOpportunityFromIntake(

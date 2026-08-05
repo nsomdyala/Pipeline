@@ -171,9 +171,9 @@ export function withOpportunityDefaults(
   const isPanel = item.isPanel ?? opportunityType === "panel";
   const lowRelevance = item.lowRelevance ?? false;
   const lane = item.lane;
+  // Prefer explicit flag. Otherwise only Manual adds start on the board.
   const inPipeline =
-    item.inPipeline ??
-    ((!lowRelevance && lane !== "Other") || item.source === "Manual");
+    item.inPipeline ?? (item.source === "Manual");
 
   const base = {
     description: item.description ?? "",

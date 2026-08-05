@@ -88,6 +88,8 @@ export type IntakeRunResult = {
   amended: number;
   unchanged: number;
   notified: number;
+  /** Releases whose OCDS category is in the configured default lane map. */
+  defaultCategoryHits: number;
   errors: string[];
   status: "ok" | "degraded" | "error";
   dateFrom: string;
