@@ -367,6 +367,14 @@ textarea:focus-visible,
   animation: mark-pulse 2.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
 
+.mark-bar-2 {
+  animation: mark-pulse 2.8s cubic-bezier(0.45, 0, 0.2, 1) 0.18s infinite;
+}
+
+.mark-bar-3 {
+  animation: mark-pulse 2.8s cubic-bezier(0.45, 0, 0.2, 1) 0.36s infinite;
+}
+
 @keyframes login-rise-in {
   from {
     opacity: 0;
@@ -404,17 +412,17 @@ textarea:focus-visible,
   0%,
   12% {
     opacity: 0.55;
-    transform: scaleX(0.72);
+    transform: scaleY(0.72);
   }
   38%,
   55% {
     opacity: 1;
-    transform: scaleX(1);
+    transform: scaleY(1);
   }
   78%,
   100% {
     opacity: 0.55;
-    transform: scaleX(0.72);
+    transform: scaleY(0.72);
   }
 }
 
@@ -534,6 +542,8 @@ textarea:focus-visible,
   .login-auth,
   .login-enter,
   .mark-bar-1,
+  .mark-bar-2,
+  .mark-bar-3,
   .company-hero-content,
   .company-toolbar,
   .company-stagger > *,

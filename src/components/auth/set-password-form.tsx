@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { PipelineMark } from "@/components/brand/pipeline-mark";
 
 export function SetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
@@ -47,7 +48,12 @@ export function SetPasswordForm({ token }: { token: string }) {
         onSubmit={onSubmit}
         className="surface w-full max-w-md p-6 md:p-8"
       >
-        <p className="label-mono mb-2">Pipeline</p>
+        <div className="mb-5 flex items-center gap-2.5">
+          <PipelineMark size={36} />
+          <div className="wordmark text-xl leading-none tracking-[-0.03em]">
+            Pipeline
+          </div>
+        </div>
         <h1 className="text-2xl font-semibold tracking-[-0.03em] text-ink">
           Set your password
         </h1>
